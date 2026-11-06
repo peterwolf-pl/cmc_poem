@@ -4,7 +4,7 @@ const $ = id => document.getElementById(id);
 const ids = ['pattern', 'pitchX', 'pitchY', 'depth', 'feed', 'retractZ', 'safeZ', 'orientation', 'origin', 'order', 'cycle', 'spindle', 'rpm'];
 const sample = ['0010100', '0111110', '1111111', '1111111', '0111110', '0011100', '0001000'].join('\n');
 $('pattern').value = sample;
-$('sourceText').value = 'CMC POEM';
+$('sourceText').value = '';
 let plan = null;
 let generated = '';
 let geometry = null;
@@ -18,37 +18,62 @@ function status(message, type = '') {
   $('status').textContent = message;
   $('status').className = `status ${type}`;
 }
+function clearGenerated() {
+  generated = '';
+  $('gcode').value = '';
+  $('downloadBtn').disabled = true;
+  $('copyBtn').disabled = true;
+}
 function update() {
   $('rpm').disabled = !$('spindle').checked;
-  const textMode = $('inputMode').value === 'text';
-  $('textSourceWrap').hidden = !textMode;
-  $('pattern').readOnly = textMode;
-  $('inputHint').textContent = textMode
-    ? 'Wygenerowany kod UTF-8. Kliknięcie siatki przełączy na tryb ręcznej edycji bitów.'
-    : 'Dozwolone: 0, 1, spacje i tabulatory. Kliknij pole na podglądzie, aby przełączyć 0/1.';
+  clearGenerated();
   try {
-    if (textMode) $('pattern').value = textToBinary($('sourceText').value, $('bytesPerRow').value);
     plan = buildPlan($('pattern').value, readSettings());
-    generated = generateGcode(plan);
-    $('gcode').value = generated;
     $('gridStat').textContent = `${plan.cols} × ${plan.rows}`;
     $('holeStat').textContent = String(plan.ones);
     $('widthStat').textContent = `${plan.width.toFixed(2)} mm`;
     $('heightStat').textContent = `${plan.height.toFixed(2)} mm`;
-    const message = `${plan.ones} nawiertów. ${plan.cols} × ${plan.rows} pól. ${plan.warnings.join(' ')}`;
+    const message = `${plan.ones} nawiertów, ${plan.cols} × ${plan.rows} pól. Kliknij „Generuj G-code”. ${plan.warnings.join(' ')}`;
     status(message, plan.warnings.length ? 'warn' : '');
-    $('downloadBtn').disabled = false;
-    $('copyBtn').disabled = false;
   } catch (error) {
     plan = null;
-    generated = '';
-    $('gcode').value = '';
     for (const id of ['gridStat', 'holeStat', 'widthStat', 'heightStat']) $(id).textContent = '-';
     status(error.message, 'error');
-    $('downloadBtn').disabled = true;
-    $('copyBtn').disabled = true;
   }
   draw();
+}
+function convertText(explicit = false) {
+  try {
+    const source = $('sourceText').value;
+    if (!source) {
+      if (explicit) throw new Error('Najpierw wpisz zwykły tekst.');
+      $('pattern').value = '';
+      update();
+      return;
+    }
+    $('pattern').value = textToBinary(source, $('bytesPerRow').value);
+    update();
+    if (explicit && plan) status(`Tekst zamieniony na ${plan.cols} × ${plan.rows} bitów. Kliknij „Generuj G-code”.`);
+  } catch (error) {
+    clearGenerated();
+    plan = null;
+    draw();
+    status(error.message, 'error');
+  }
+}
+function generate() {
+  try {
+    plan = buildPlan($('pattern').value, readSettings());
+    generated = generateGcode(plan);
+    $('gcode').value = generated;
+    $('copyBtn').disabled = false;
+    $('downloadBtn').disabled = false;
+    status(`Wygenerowano G-code: ${plan.ones} nawiertów. Możesz skopiować kod lub pobrać plik .TAP.`);
+    $('outputPanel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  } catch (error) {
+    clearGenerated();
+    status(error.message, 'error');
+  }
 }
 
 function draw() {
@@ -112,16 +137,27 @@ $('matrixCanvas').addEventListener('click', event => {
   const c = Math.round((x - left) / step), r = Math.round((y - top) / step);
   if (r < 0 || r >= rows || c < 0 || c >= cols) return;
   if (Math.hypot(x - left - c * step, y - top - r * step) > Math.max(12, Math.min(22, step * .5))) return;
-  if ($('inputMode').value === 'text') $('inputMode').value = 'binary';
+  $('sourceText').value = '';
   $('pattern').value = toggleCell($('pattern').value, $('orientation').value, r, c);
   update();
 });
 
-for (const id of ids) $(id).addEventListener(id === 'spindle' || ['orientation','origin','order','cycle'].includes(id) ? 'change' : 'input', update);
-$('inputMode').addEventListener('change', update);
-$('sourceText').addEventListener('input', update);
-$('bytesPerRow').addEventListener('input', update);
-$('sampleBtn').addEventListener('click', () => { $('inputMode').value = 'binary'; $('pattern').value = sample;update(); });
+for (const id of ids) {
+  $(id).addEventListener(id === 'spindle' || ['orientation','origin','order','cycle'].includes(id) ? 'change' : 'input', () => {
+    if (id === 'pattern') $('sourceText').value = '';
+    update();
+  });
+}
+$('sourceText').addEventListener('input', () => convertText());
+$('bytesPerRow').addEventListener('input', () => { if ($('sourceText').value) convertText(); else update(); });
+$('convertBtn').addEventListener('click', () => convertText(true));
+$('sampleBtn').addEventListener('click', () => {
+  $('sourceText').value = '';
+  $('pattern').value = sample;
+  update();
+});
+$('generateBtn').addEventListener('click', generate);
+$('generateBtnOutput').addEventListener('click', generate);
 $('downloadBtn').addEventListener('click', () => {
   if (!generated || !plan) return;
   const blob = new Blob([generated], { type: 'text/plain;charset=utf-8' });

@@ -25,15 +25,14 @@
         <div class="control-column">
           <section class="panel">
             <div class="panel-head"><span class="step">01</span><h2>Wzór binarny</h2><button id="sampleBtn" type="button" class="button-text">Wstaw przykład</button></div>
-            <label class="field field-full">Rodzaj wejścia<select id="inputMode"><option value="binary">Macierz zer i jedynek</option><option value="text">Zwykły tekst → UTF-8 → 0/1</option></select></label>
-            <div id="textSourceWrap" class="text-source-wrap" hidden>
-              <label for="sourceText" class="field-label">Tekst do zakodowania, np. fragment wiersza</label>
-              <textarea id="sourceText" spellcheck="false" placeholder="Wpisz swój tekst"></textarea>
-              <label class="field byte-field">Bajtów UTF-8 na wiersz <span>1-31</span><input id="bytesPerRow" type="number" min="1" max="31" step="1" value="8"></label>
+            <div class="text-source-wrap">
+              <label for="sourceText" class="field-label"><strong>Wpisz zwykły tekst</strong> (również polskie znaki)</label>
+              <textarea id="sourceText" spellcheck="false" placeholder="Tutaj wpisz tekst lub wiersz. Bity UTF-8 powstaną automatycznie..."></textarea>
+              <div class="convert-row"><label class="field byte-field">Bajtów UTF-8 na wiersz <span>1-31</span><input id="bytesPerRow" type="number" min="1" max="31" step="1" value="8"></label><button id="convertBtn" type="button" class="btn btn-secondary">Zamień tekst na 0/1 ↓</button></div>
             </div>
-            <label for="pattern" class="field-label binary-label">Macierz 0/1. Każdy wiersz to kolejny rząd pól.</label>
+            <label for="pattern" class="field-label binary-label"><strong>Macierz 0/1</strong> (możesz także wpisać lub zmienić bity ręcznie)</label>
             <textarea id="pattern" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="Macierz binarna"></textarea>
-            <div class="hint" id="inputHint">Dozwolone: 0, 1, spacje i tabulatory. Kliknij pole na podglądzie, aby przełączyć 0/1.</div>
+            <div class="hint" id="inputHint">0 = bez nawiertu, 1 = nawiert. Edycja bitów aktualizuje podgląd, ale program CNC powstaje dopiero po kliknięciu przycisku Generuj G-code.</div>
           </section>
           <section class="panel">
             <div class="panel-head"><span class="step">02</span><h2>Geometria</h2></div>
@@ -55,6 +54,7 @@
               <label class="field field-full">Metoda generowania<select id="cycle"><option value="explicit">G0 / G1 · pełne cofnięcie po każdym otworze</option><option value="g81">G81 / G98 · standardowy cykl wiercenia</option></select></label>
             </div>
             <div class="spindle-row"><label class="toggle-label"><input type="checkbox" id="spindle"> Automatyczny start wrzeciona (M3)</label><label class="field rpm-field" id="rpmWrap">Obroty S <span>obr/min</span><input id="rpm" type="number" min="1" max="1000000" step="100" value="10000" disabled></label></div>
+            <button type="button" id="generateBtn" class="btn btn-primary generate-btn">▶ Generuj G-code</button>
           </section>
         </div>
         <div class="preview-column">
@@ -64,15 +64,16 @@
             <div class="stats" aria-live="polite"><div><small>SIATKA</small><strong id="gridStat">-</strong></div><div><small>NAWIERTY</small><strong id="holeStat">-</strong></div><div><small>SZEROKOŚĆ X</small><strong id="widthStat">-</strong></div><div><small>WYSOKOŚĆ Y</small><strong id="heightStat">-</strong></div></div>
             <p class="dimension-note">Wymiary dotyczą skrajnych <strong>środków</strong> nawiertów. Nie uwzględniają średnicy narzędzia ani marginesu materiału.</p>
           </section>
-          <section class="panel output-panel">
+          <section class="panel output-panel" id="outputPanel">
             <div class="panel-head"><span class="step">05</span><h2>Program Mach3Mill</h2><span class="micro-label">.TAP / .NC</span></div>
-            <div id="status" class="status" role="status" aria-live="polite">Gotowe do generowania.</div>
-            <textarea id="gcode" readonly spellcheck="false" aria-label="Wygenerowany G-code"></textarea>
-            <div class="action-row"><button type="button" id="copyBtn" class="btn btn-secondary">Kopiuj kod</button><button type="button" id="downloadBtn" class="btn btn-primary">Pobierz .TAP ↗</button></div>
+            <button type="button" id="generateBtnOutput" class="btn btn-primary generate-btn output-generate-btn">▶ Generuj G-code</button>
+            <div id="status" class="status" role="status" aria-live="polite">Ustaw parametry i kliknij Generuj G-code.</div>
+            <textarea id="gcode" readonly spellcheck="false" aria-label="Wygenerowany G-code" placeholder="Tu pojawi się G-code po kliknięciu Generuj G-code."></textarea>
+            <div class="action-row"><button type="button" id="copyBtn" class="btn btn-secondary" disabled>Kopiuj kod</button><button type="button" id="downloadBtn" class="btn btn-primary" disabled>Pobierz .TAP ↗</button></div>
           </section>
         </div>
       </div>
-      <footer><p><strong>Bezpieczeństwo:</strong> Program zakłada Z0 na powierzchni materiału, wybrany narożnik w G54 i dodatnie Z ponad materiałem. Zawsze wykonaj symulację oraz przejazd próbny nad materiałem. Sprawdź mocowanie, średnicę narzędzia, limity osi i sterowanie wrzecionem.</p><span>CMC POEM / OFFLINE GENERATOR / v1.0</span></footer>
+      <footer><p><strong>Bezpieczeństwo:</strong> Program zakłada Z0 na powierzchni materiału, wybrany narożnik w G54 i dodatnie Z ponad materiałem. Zawsze wykonaj symulację oraz przejazd próbny nad materiałem. Sprawdź mocowanie, średnicę narzędzia, limity osi i sterowanie wrzecionem.</p><span>CMC POEM / OFFLINE GENERATOR / v1.1</span></footer>
     </main>
   </div>
   <script type="module" src="./src/app.mjs"></script>

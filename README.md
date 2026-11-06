@@ -16,7 +16,7 @@ Następnie otwórz w przeglądarce `http://localhost:8080`. Możesz też hostowa
 ## Funkcje
 
 - Wprowadzanie siatki zer i jedynek, ze spacjami lub bez. Każdy wiersz tekstu reprezentuje osobny rząd.
-- Alternatywny tryb: wpisz zwykły tekst lub wiersz, a aplikacja zakoduje go jako UTF-8 (8 bitów na bajt), z wyborem od 1 do 31 bajtów na wiersz i automatycznym zawijaniem. Puste linie w tekście generują puste rzędy nawiertów.
+- Widoczne pole zwykłego tekstu: wpisz tekst lub wiersz, a aplikacja automatycznie zakoduje go jako UTF-8 (8 bitów na bajt). Dostępny jest także przycisk **Zamień tekst na 0/1**, od 1 do 31 bajtów na wiersz i automatyczne zawijanie. Puste linie tworzą rzędy bez nawiertów.
 - Klikanie w podglądzie przełącza `0/1` i aktualizuje kod.
 - Układ poziomy lub pionowy. Pionowy obraca tekstową macierz o **90° zgodnie z ruchem wskazówek zegara**.
 - Punkt `(0,0)` w jednym z czterech narożników siatki.
@@ -24,6 +24,7 @@ Następnie otwórz w przeglądarce `http://localhost:8080`. Możesz też hostowa
 - Obliczanie liczby otworów i wymiarów pomiędzy skrajnymi środkami nawiertów.
 - Głębokość poniżej Z0, posuw, poziom podejścia R, bezpieczne Z.
 - Eksport dwóch wariantów: jawne ruchy `G0/G1` lub cykl wiercenia `G81` z `G98`.
+- Podgląd siatki odświeża się na bieżąco, natomiast przycisk **Generuj G-code** uruchamia generowanie programu CNC. Po zmianie parametrów wcześniejszy kod jest usuwany, aby nie pobrać nieaktualnego pliku.
 - Kolejność wierszami lub wężykiem. Gotowy plik `.tap` lub kopiowanie G-code.
 - Opcjonalne `S... M3` i `M5`; domyślnie generator **nie uruchamia wrzeciona**.
 

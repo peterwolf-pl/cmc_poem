@@ -8,3 +8,15 @@ textarea,input,select{border:1px solid #384448;background:#0c1214;color:#edf3f0;
 @media(max-width:990px){.workspace{grid-template-columns:1fr}.preview-column{order:-1}.hero{align-items:start}.legend{align-self:end}.canvas-frame{height:350px}}@media(max-width:650px){.shell{padding:0 14px}.site-header{height:70px}.machine-chip{font-size:9px;padding:7px}.hero{flex-direction:column;align-items:start;padding:30px 0}.hero h1{font-size:35px}.legend{align-self:start;padding-top:12px}.panel{padding:16px}.canvas-frame{height:320px}.stats{grid-template-columns:1fr 1fr}.stats>div:nth-child(2){border-right:0}.stats>div:nth-child(-n+2){border-bottom:1px solid var(--line)}.spindle-row{flex-wrap:wrap}footer{flex-direction:column}.micro-label{font-size:9px}}
 
 #inputMode{margin-bottom:14px}.text-source-wrap{padding:16px;background:#0d1416;border:1px solid #2b363a;margin-bottom:16px;border-radius:5px}.text-source-wrap[hidden]{display:none}#sourceText{width:100%;min-height:100px;resize:vertical;padding:12px;font:13px/1.5 ui-monospace,monospace}.byte-field{margin-top:13px;max-width:220px}#pattern[readonly]{color:#90a9a2;background:#101719}
+
+/* Explicit text-to-binary controls and G-code generation. */
+.text-source-wrap{display:block}
+#sourceText{min-height:125px}
+.field-label strong{color:#ebf6f0;font-weight:700}
+.convert-row{display:flex;gap:12px;align-items:end;flex-wrap:wrap}
+.convert-row .byte-field{flex:1;max-width:220px;min-width:135px}
+.convert-row .btn{flex:1;min-width:175px;padding:12px}
+.generate-btn{display:block;width:100%;min-height:52px;margin-top:20px;font-size:15px;letter-spacing:.03em;box-shadow:0 0 0 1px #c0f5e3 inset}
+.generate-btn:focus-visible{outline:3px solid #fff;outline-offset:3px}
+.output-generate-btn{margin:0 0 15px}
+@media(max-width:990px){.preview-column{order:0}}
