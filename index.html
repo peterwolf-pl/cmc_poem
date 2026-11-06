@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="dark">
+  <meta name="description" content="Generator G-code Mach3Mill z matrycy 0/1. Wiercenie CNC, podgląd siatki, orientacja i punkt zerowy.">
+  <title>CMC POEM | Binary to G-code</title>
+  <link rel="stylesheet" href="./src/styles.css">
+</head>
+<body>
+  <div class="shell">
+    <header class="site-header">
+      <div class="brand"><span class="brand-mark">●<span>○</span></span><div><strong>CMC POEM</strong><small>01 / CNC DRILLING</small></div></div>
+      <span class="machine-chip">POSTPROCESSOR / MACH3MILL</span>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div><div class="eyebrow">BINARY MATRIX → PHYSICAL MARKS</div><h1>Od kodu 0/1<br>do nawiertów CNC.</h1><p>Wklej tekst binarny, ustaw geometrię i parametry obróbki. Aplikacja oblicza pozycje otworów i generuje G-code gotowy do sprawdzenia w Mach3Mill.</p></div>
+        <div class="legend"><span><i class="dot dot-on"></i>1 · NAWIERT</span><span><i class="dot dot-off"></i>0 · POMIŃ</span></div>
+      </section>
+
+      <div class="workspace">
+        <div class="control-column">
+          <section class="panel">
+            <div class="panel-head"><span class="step">01</span><h2>Wzór binarny</h2><button id="sampleBtn" type="button" class="button-text">Wstaw przykład</button></div>
+            <label class="field field-full">Rodzaj wejścia<select id="inputMode"><option value="binary">Macierz zer i jedynek</option><option value="text">Zwykły tekst → UTF-8 → 0/1</option></select></label>
+            <div id="textSourceWrap" class="text-source-wrap" hidden>
+              <label for="sourceText" class="field-label">Tekst do zakodowania, np. fragment wiersza</label>
+              <textarea id="sourceText" spellcheck="false" placeholder="Wpisz swój tekst"></textarea>
+              <label class="field byte-field">Bajtów UTF-8 na wiersz <span>1-31</span><input id="bytesPerRow" type="number" min="1" max="31" step="1" value="8"></label>
+            </div>
+            <label for="pattern" class="field-label binary-label">Macierz 0/1. Każdy wiersz to kolejny rząd pól.</label>
+            <textarea id="pattern" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="Macierz binarna"></textarea>
+            <div class="hint" id="inputHint">Dozwolone: 0, 1, spacje i tabulatory. Kliknij pole na podglądzie, aby przełączyć 0/1.</div>
+          </section>
+          <section class="panel">
+            <div class="panel-head"><span class="step">02</span><h2>Geometria</h2></div>
+            <div class="field-grid">
+              <label class="field">Odstęp X <span>mm</span><input id="pitchX" type="number" min="0.001" max="1000000" step="0.1" value="3"></label>
+              <label class="field">Odstęp Y <span>mm</span><input id="pitchY" type="number" min="0.001" max="1000000" step="0.1" value="3"></label>
+              <label class="field field-full">Układ wzoru<select id="orientation"><option value="horizontal">Poziomy · zgodnie z tekstem</option><option value="vertical">Pionowy · obrót 90° w prawo</option></select></label>
+              <label class="field field-full">Punkt 0,0 na siatce<select id="origin"><option value="bottom-left">Lewy dolny narożnik</option><option value="bottom-right">Prawy dolny narożnik</option><option value="top-left">Lewy górny narożnik</option><option value="top-right">Prawy górny narożnik</option></select></label>
+              <label class="field field-full">Kolejność przejścia<select id="order"><option value="serpentine">Wężyk · krótsze przejazdy</option><option value="rows">Wierszami · od lewej do prawej</option></select></label>
+            </div>
+          </section>
+          <section class="panel">
+            <div class="panel-head"><span class="step">03</span><h2>Parametry wiercenia</h2></div>
+            <div class="field-grid">
+              <label class="field">Głębokość poniżej Z0 <span>mm</span><input id="depth" type="number" min="0.001" max="1000000" step="0.1" value="0.8"></label>
+              <label class="field">Posuw F <span>mm/min</span><input id="feed" type="number" min="0.001" max="1000000" step="1" value="80"></label>
+              <label class="field">Poziom podejścia R <span>mm</span><input id="retractZ" type="number" min="0.001" max="1000000" step="0.5" value="2"></label>
+              <label class="field">Bezpieczne Z <span>mm</span><input id="safeZ" type="number" min="0.001" max="1000000" step="0.5" value="5"></label>
+              <label class="field field-full">Metoda generowania<select id="cycle"><option value="explicit">G0 / G1 · pełne cofnięcie po każdym otworze</option><option value="g81">G81 / G98 · standardowy cykl wiercenia</option></select></label>
+            </div>
+            <div class="spindle-row"><label class="toggle-label"><input type="checkbox" id="spindle"> Automatyczny start wrzeciona (M3)</label><label class="field rpm-field" id="rpmWrap">Obroty S <span>obr/min</span><input id="rpm" type="number" min="1" max="1000000" step="100" value="10000" disabled></label></div>
+          </section>
+        </div>
+        <div class="preview-column">
+          <section class="panel preview-panel">
+            <div class="panel-head"><span class="step">04</span><h2>Podgląd nawiertów</h2><span class="micro-label">WIDOK Z GÓRY</span></div>
+            <div class="canvas-frame"><canvas id="matrixCanvas" aria-label="Podgląd macierzy wierceń - kliknij, aby zmienić pole"></canvas><div class="canvas-axis">X → &nbsp; Y ↑</div></div>
+            <div class="stats" aria-live="polite"><div><small>SIATKA</small><strong id="gridStat">-</strong></div><div><small>NAWIERTY</small><strong id="holeStat">-</strong></div><div><small>SZEROKOŚĆ X</small><strong id="widthStat">-</strong></div><div><small>WYSOKOŚĆ Y</small><strong id="heightStat">-</strong></div></div>
+            <p class="dimension-note">Wymiary dotyczą skrajnych <strong>środków</strong> nawiertów. Nie uwzględniają średnicy narzędzia ani marginesu materiału.</p>
+          </section>
+          <section class="panel output-panel">
+            <div class="panel-head"><span class="step">05</span><h2>Program Mach3Mill</h2><span class="micro-label">.TAP / .NC</span></div>
+            <div id="status" class="status" role="status" aria-live="polite">Gotowe do generowania.</div>
+            <textarea id="gcode" readonly spellcheck="false" aria-label="Wygenerowany G-code"></textarea>
+            <div class="action-row"><button type="button" id="copyBtn" class="btn btn-secondary">Kopiuj kod</button><button type="button" id="downloadBtn" class="btn btn-primary">Pobierz .TAP ↗</button></div>
+          </section>
+        </div>
+      </div>
+      <footer><p><strong>Bezpieczeństwo:</strong> Program zakłada Z0 na powierzchni materiału, wybrany narożnik w G54 i dodatnie Z ponad materiałem. Zawsze wykonaj symulację oraz przejazd próbny nad materiałem. Sprawdź mocowanie, średnicę narzędzia, limity osi i sterowanie wrzecionem.</p><span>CMC POEM / OFFLINE GENERATOR / v1.0</span></footer>
+    </main>
+  </div>
+  <script type="module" src="./src/app.mjs"></script>
+</body>
+</html>
