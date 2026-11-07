@@ -42,6 +42,14 @@
               <label class="field field-full">Układ wzoru<select id="orientation"><option value="horizontal">Poziomy · zgodnie z tekstem</option><option value="vertical">Pionowy · obrót 90° w prawo</option></select></label>
               <label class="field field-full">Punkt 0,0 na siatce<select id="origin"><option value="bottom-left">Lewy dolny narożnik</option><option value="bottom-right">Prawy dolny narożnik</option><option value="top-left">Lewy górny narożnik</option><option value="top-right">Prawy górny narożnik</option></select></label>
               <label class="field field-full">Kolejność przejścia<select id="order"><option value="serpentine">Wężyk · krótsze przejazdy</option><option value="rows">Wierszami · od lewej do prawej</option></select></label>
+              <div id="stageOptions" class="field-full stage-settings" hidden>
+                <label class="toggle-label stage-toggle"><input type="checkbox" id="splitEnabled" checked> Podziel długi wzór na niezależne etapy</label>
+                <div class="field-grid" id="stageDimensions">
+                  <label class="field">Maks. obszar X <span>mm</span><input id="maxAreaX" type="number" min="0.1" max="1000000" step="1" value="100"></label>
+                  <label class="field">Maks. obszar Y <span>mm</span><input id="maxAreaY" type="number" min="0.1" max="1000000" step="1" value="100"></label>
+                </div>
+                <p class="hint">Limit dotyczy całego otworu wraz ze średnicą narzędzia. Każdy etap ma własne lokalne X0/Y0 w G54. Przed kolejnym plikiem przesuń i ponownie zbazuj materiał.</p>
+              </div>
             </div>
           </section>
           <section class="panel">
@@ -51,7 +59,13 @@
               <label class="field">Posuw F <span>mm/min</span><input id="feed" type="number" min="0.001" max="1000000" step="1" value="80"></label>
               <label class="field">Poziom podejścia R <span>mm</span><input id="retractZ" type="number" min="0.001" max="1000000" step="0.5" value="2"></label>
               <label class="field">Bezpieczne Z <span>mm</span><input id="safeZ" type="number" min="0.001" max="1000000" step="0.5" value="5"></label>
-              <label class="field field-full">Metoda generowania<select id="cycle"><option value="explicit">G0 / G1 · pełne cofnięcie po każdym otworze</option><option value="g81">G81 / G98 · standardowy cykl wiercenia</option></select></label>
+              <label class="field field-full">Metoda generowania<select id="cycle"><option value="explicit">G0 / G1 · pełne cofnięcie po każdym otworze</option><option value="g81">G81 / G98 · standardowy cykl wiercenia</option><option value="helix">G3 · zagłębianie spiralne (interpolacja śrubowa)</option></select></label>
+              <label class="field field-full">Średnica frezu / wiertła <span>mm</span><input id="toolDiameter" type="number" min="0.001" max="1000000" step="0.1" value="1"></label>
+              <div id="helixOptions" class="field-full field-grid helix-settings" hidden>
+                <label class="field">Średnica wykonywanego otworu <span>mm</span><input id="holeDiameter" type="number" min="0.001" max="1000000" step="0.1" value="2"></label>
+                <label class="field">Zejście Z na pełen obrót <span>mm/obr</span><input id="helixStep" type="number" min="0.01" max="1000000" step="0.05" value="0.25"></label>
+                <p class="hint field-full">Helisa G3: dwa półokręgi na obrót, G91.1, płaskie wykończenie dna. Średnica otworu musi być większa od frezu, ale nie może przekraczać 2 × średnicy frezu. Wymagany frez czołowy z możliwością zagłębiania.</p>
+              </div>
             </div>
             <div class="spindle-row"><label class="toggle-label"><input type="checkbox" id="spindle"> Automatyczny start wrzeciona (M3)</label><label class="field rpm-field" id="rpmWrap">Obroty S <span>obr/min</span><input id="rpm" type="number" min="1" max="1000000" step="100" value="10000" disabled></label></div>
             <button type="button" id="generateBtn" class="btn btn-primary generate-btn">▶ Generuj G-code</button>
@@ -61,6 +75,7 @@
           <section class="panel preview-panel">
             <div class="panel-head"><span class="step">04</span><h2>Podgląd nawiertów</h2><span class="micro-label">WIDOK Z GÓRY</span></div>
             <div class="canvas-frame"><canvas id="matrixCanvas" aria-label="Podgląd macierzy wierceń - kliknij, aby zmienić pole"></canvas><div class="canvas-axis">X → &nbsp; Y ↑</div></div>
+            <div id="stageSummary" class="stage-summary" aria-live="polite">Etapy: 1</div>
             <div class="stats" aria-live="polite"><div><small>SIATKA</small><strong id="gridStat">-</strong></div><div><small>NAWIERTY</small><strong id="holeStat">-</strong></div><div><small>SZEROKOŚĆ X</small><strong id="widthStat">-</strong></div><div><small>WYSOKOŚĆ Y</small><strong id="heightStat">-</strong></div></div>
             <p class="dimension-note">Wymiary dotyczą skrajnych <strong>środków</strong> nawiertów. Nie uwzględniają średnicy narzędzia ani marginesu materiału.</p>
           </section>
@@ -68,12 +83,19 @@
             <div class="panel-head"><span class="step">05</span><h2>Program Mach3Mill</h2><span class="micro-label">.TAP / .NC</span></div>
             <button type="button" id="generateBtnOutput" class="btn btn-primary generate-btn output-generate-btn">▶ Generuj G-code</button>
             <div id="status" class="status" role="status" aria-live="polite">Ustaw parametry i kliknij Generuj G-code.</div>
+            <div class="stage-switcher">
+              <label class="field">Wybierz etap do podglądu / pobrania
+                <select id="stageSelect" aria-label="Wybierz etap"><option value="0">Etap 1</option></select>
+              </label>
+              <p id="stageDetail" class="hint">Wszystkie współrzędne etapów są lokalne względem nowego G54.</p>
+            </div>
             <textarea id="gcode" readonly spellcheck="false" aria-label="Wygenerowany G-code" placeholder="Tu pojawi się G-code po kliknięciu Generuj G-code."></textarea>
-            <div class="action-row"><button type="button" id="copyBtn" class="btn btn-secondary" disabled>Kopiuj kod</button><button type="button" id="downloadBtn" class="btn btn-primary" disabled>Pobierz .TAP ↗</button></div>
+            <div class="action-row"><button type="button" id="copyBtn" class="btn btn-secondary" disabled>Kopiuj kod</button><button type="button" id="downloadBtn" class="btn btn-primary" disabled>Pobierz etap .TAP</button></div>
+            <button type="button" id="downloadAllBtn" class="btn btn-outline download-all" disabled>Pobierz wszystkie etapy ZIP</button>
           </section>
         </div>
       </div>
-      <footer><p><strong>Bezpieczeństwo:</strong> Program zakłada Z0 na powierzchni materiału, wybrany narożnik w G54 i dodatnie Z ponad materiałem. Zawsze wykonaj symulację oraz przejazd próbny nad materiałem. Sprawdź mocowanie, średnicę narzędzia, limity osi i sterowanie wrzecionem.</p><span>CMC POEM / OFFLINE GENERATOR / v1.1</span></footer>
+      <footer><p><strong>Bezpieczeństwo:</strong> Program zakłada Z0 na powierzchni materiału, wybrany narożnik w G54 i dodatnie Z ponad materiałem. Zawsze wykonaj symulację oraz przejazd próbny nad materiałem. Sprawdź mocowanie, średnicę narzędzia, limity osi i sterowanie wrzecionem.</p><span>CMC POEM / OFFLINE GENERATOR / v1.2</span></footer>
     </main>
   </div>
   <script type="module" src="./src/app.mjs"></script>

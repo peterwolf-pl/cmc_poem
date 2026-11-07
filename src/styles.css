@@ -20,3 +20,17 @@ textarea,input,select{border:1px solid #384448;background:#0c1214;color:#edf3f0;
 .generate-btn:focus-visible{outline:3px solid #fff;outline-offset:3px}
 .output-generate-btn{margin:0 0 15px}
 @media(max-width:990px){.preview-column{order:0}}
+
+/* Stage splitting and spiral interpolation controls */
+.stage-settings,.helix-settings{border:1px solid #364746;padding:15px;border-radius:6px;background:#0d1416}
+.stage-settings[hidden],.helix-settings[hidden]{display:none!important}
+.stage-settings .field-grid,.helix-settings.field-grid{margin-top:12px}
+.stage-toggle{margin-bottom:8px}
+.stage-summary{margin-top:14px;padding:11px 12px;border:1px solid #3b5b53;border-radius:5px;color:#d4eee5;font-size:12px;background:#11201d}
+.stage-switcher{margin-bottom:12px;padding:13px 14px;border:1px solid var(--line);border-radius:5px;background:#0c1214}
+.stage-switcher .field select{margin-bottom:8px}
+.stage-switcher .hint{margin:0}
+.download-all{margin-top:12px;background:#1d3030;color:#c9eee2;border-color:#3a695b;width:100%;font-size:13px}
+.download-all:hover:not(:disabled){filter:brightness(1.15)}
+@media(max-width:650px){.stage-settings,.helix-settings{padding:12px}.stage-settings .field-grid{grid-template-columns:1fr}}
+#stageDimensions[hidden]{display:none!important}

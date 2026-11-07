@@ -22,7 +22,7 @@ test('visible text input converts to UTF-8 bits, explicit generate and stale cod
     setTransform(){},clearRect(){},fillText(){},beginPath(){},moveTo(){},lineTo(){},stroke(){},arc(){},fill(){},
   };
   elements.get('matrixCanvas').getContext = () => ctx;
-  for (const [id, value] of Object.entries({pitchX:'3',pitchY:'3',depth:'0.8',feed:'80',retractZ:'2',safeZ:'5',orientation:'horizontal',origin:'bottom-left',order:'serpentine',cycle:'explicit',rpm:'10000',bytesPerRow:'8'})) elements.get(id).value = value;
+  for (const [id, value] of Object.entries({pitchX:'3',pitchY:'3',depth:'0.8',feed:'80',retractZ:'2',safeZ:'5',orientation:'horizontal',origin:'bottom-left',order:'serpentine',cycle:'explicit',rpm:'10000',bytesPerRow:'8',toolDiameter:'1',holeDiameter:'2',helixStep:'0.25',maxAreaX:'100',maxAreaY:'100'})) elements.get(id).value = value;
   globalThis.document = {getElementById(id){assert(elements.has(id),`missing ${id}`);return elements.get(id);}};
   globalThis.window = {devicePixelRatio:1,addEventListener(){}};
   const el = id=>elements.get(id);
@@ -31,6 +31,7 @@ test('visible text input converts to UTF-8 bits, explicit generate and stale cod
     await import('../src/app.mjs');
     assert.equal(el('gcode').value,'');
     assert(el('downloadBtn').disabled);
+    el('splitEnabled').checked=true;
     el('sourceText').value='Ał';
     emit('sourceText');
     assert(el('pattern').value.startsWith('010000011100010110000010'));
@@ -45,6 +46,7 @@ test('visible text input converts to UTF-8 bits, explicit generate and stale cod
     assert(el('downloadBtn').disabled);
     emit('generateBtn','click');
     assert.match(el('gcode').value,/M30/);
+    assert.equal(el('downloadAllBtn').disabled,false);
     el('pattern').value='101';
     emit('pattern');
     assert.equal(el('sourceText').value,'');
@@ -53,6 +55,26 @@ test('visible text input converts to UTF-8 bits, explicit generate and stale cod
     emit('convertBtn','click');
     assert.match(el('pattern').value,/^01011010/);
     assert(el('downloadBtn').disabled);
+    el('orientation').value='vertical';
+    emit('orientation','change');
+    el('maxAreaY').value='7';
+    emit('maxAreaY');
+    assert.match(el('stageSummary').textContent,/etapów/);
+    assert.match(el('stageSelect').innerHTML,/Etap 1/);
+    emit('generateBtnOutput','click');
+    assert.match(el('gcode').value,/\(STAGE \d+\/\d+/);
+    assert.equal(el('downloadAllBtn').disabled,false);
+    const first=el('gcode').value;
+    el('stageSelect').value='1';
+    emit('stageSelect','change');
+    assert.notEqual(el('stageDetail').textContent,'');
+    assert.notEqual(el('gcode').value,first);
+    el('cycle').value='helix';
+    emit('cycle','change');
+    assert(el('downloadAllBtn').disabled);
+    emit('generateBtn','click');
+    assert.match(el('gcode').value,/G91\.1/);
+    assert.match(el('gcode').value,/G3 /);
   } finally {
     delete globalThis.document;
     delete globalThis.window;

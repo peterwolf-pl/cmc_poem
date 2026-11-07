@@ -1,13 +1,17 @@
-import { buildPlan, generateGcode, toggleCell, textToBinary } from './gcode.mjs';
+import { buildPlan, buildStages, generateGcode, toggleCell, textToBinary } from './gcode.mjs';
+import { packZip } from './zip.mjs';
 
 const $ = id => document.getElementById(id);
-const ids = ['pattern', 'pitchX', 'pitchY', 'depth', 'feed', 'retractZ', 'safeZ', 'orientation', 'origin', 'order', 'cycle', 'spindle', 'rpm'];
+const ids = ['pattern', 'pitchX', 'pitchY', 'depth', 'feed', 'retractZ', 'safeZ', 'orientation', 'origin', 'order', 'cycle', 'spindle', 'rpm', 'toolDiameter', 'holeDiameter', 'helixStep'];
 const sample = ['0010100', '0111110', '1111111', '1111111', '0111110', '0011100', '0001000'].join('\n');
 $('pattern').value = sample;
 $('sourceText').value = '';
 let plan = null;
 let generated = '';
 let geometry = null;
+let stageData = null;
+let generatedParts = [];
+let currentStage = 0;
 
 function readSettings() {
   const result = {};
@@ -23,24 +27,65 @@ function clearGenerated() {
   $('gcode').value = '';
   $('downloadBtn').disabled = true;
   $('copyBtn').disabled = true;
+  $('downloadAllBtn').disabled = true;
+  generatedParts = [];
+}
+function stageOptions() {
+  return {
+    enabled: $('orientation').value === 'vertical' && $('splitEnabled').checked,
+    maxAreaX: $('maxAreaX').value,
+    maxAreaY: $('maxAreaY').value,
+    drillDiameter: $('toolDiameter').value,
+  };
 }
 function update() {
   $('rpm').disabled = !$('spindle').checked;
+  const isVertical = $('orientation').value === 'vertical';
+  const isHelix = $('cycle').value === 'helix';
+  $('stageOptions').hidden = !isVertical;
+  $('stageDimensions').hidden = !isVertical || !$('splitEnabled').checked;
+  $('helixOptions').hidden = !isHelix;
   clearGenerated();
   try {
     plan = buildPlan($('pattern').value, readSettings());
+    stageData = buildStages(plan, stageOptions());
+    currentStage = Math.min(currentStage, stageData.stages.length-1);
+    populateStages();
     $('gridStat').textContent = `${plan.cols} × ${plan.rows}`;
     $('holeStat').textContent = String(plan.ones);
     $('widthStat').textContent = `${plan.width.toFixed(2)} mm`;
     $('heightStat').textContent = `${plan.height.toFixed(2)} mm`;
-    const message = `${plan.ones} nawiertów, ${plan.cols} × ${plan.rows} pól. Kliknij „Generuj G-code”. ${plan.warnings.join(' ')}`;
-    status(message, plan.warnings.length ? 'warn' : '');
+    $('stageSummary').textContent = `${stageData.total} etapów (maks. ${stageData.columnsPerStage} kolumn × ${stageData.rowsPerStage} wierszy na etap). Siatka: ${plan.width.toFixed(2)} × ${plan.height.toFixed(2)} mm między środkami.`;
+    status(`${plan.ones} nawiertów, ${stageData.total} etapów. Kliknij „Generuj G-code”. ${plan.warnings.join(' ')}`, plan.warnings.length ? 'warn' : '');
   } catch (error) {
-    plan = null;
+    plan = null; stageData = null;
     for (const id of ['gridStat', 'holeStat', 'widthStat', 'heightStat']) $(id).textContent = '-';
+    $('stageSummary').textContent = 'Błąd parametrów etapów.';
+    $('stageDetail').textContent = '';
+    $('stageSelect').innerHTML = '';
     status(error.message, 'error');
   }
   draw();
+}
+function populateStages() {
+  // Stage metadata is derived only from validated numeric coordinates.
+  $('stageSelect').innerHTML = stageData.stages.map((s,i) =>
+    `<option value="${i}">Etap ${s.stage.number}/${s.stage.total} - ${s.ones} nawiertów${s.ones ? '' : ' (pusty)'}</option>`).join('');
+  $('stageSelect').value = String(currentStage);
+  showStageDetails();
+}
+function showStageDetails() {
+  if (!stageData) return;
+  const s = stageData.stages[currentStage];
+  const t = s.stage;
+  $('stageDetail').textContent = `Etap ${t.number}/${t.total}. Siatka: kolumny ${t.colStart+1}-${t.colEnd}, wiersze ${t.rowStart+1}-${t.rowEnd}. `+
+    `Zajęty obszar ${t.footprintX.toFixed(2)} × ${t.footprintY.toFixed(2)} mm (z narzędziem). `+
+    `Pozycja jego zera względem zera całego wzoru: X${t.offsetX.toFixed(2)} Y${t.offsetY.toFixed(2)} mm. `+
+    `Przed uruchomieniem ustaw ponownie G54 X0/Y0 w narożniku tego etapu.`;
+  generated = generatedParts[currentStage] || '';
+  $('gcode').value = generated;
+  $('copyBtn').disabled = !generated;
+  $('downloadBtn').disabled = !generated;
 }
 function convertText(explicit = false) {
   try {
@@ -64,16 +109,55 @@ function convertText(explicit = false) {
 function generate() {
   try {
     plan = buildPlan($('pattern').value, readSettings());
-    generated = generateGcode(plan);
-    $('gcode').value = generated;
-    $('copyBtn').disabled = false;
-    $('downloadBtn').disabled = false;
-    status(`Wygenerowano G-code: ${plan.ones} nawiertów. Możesz skopiować kod lub pobrać plik .TAP.`);
+    stageData = buildStages(plan, stageOptions());
+    generatedParts = stageData.stages.map(s => s.ones ? generateGcode(s) : '');
+    if (!generatedParts.some(Boolean)) throw new Error('Brak nawiertów do generowania.');
+    if (generatedParts.reduce((total,part) => total+part.length,0) > 25000000)
+      throw new Error('Łączny kod przekracza 25 MB. Użyj mniejszej siatki lub większego zejścia spiralnego.');
+    currentStage = generatedParts.findIndex(Boolean);
+    populateStages();
+    $('downloadAllBtn').disabled = false;
+    status(`Wygenerowano ${generatedParts.filter(Boolean).length} niezależnych plików .TAP dla ${stageData.total} etapów. Pobierz ZIP lub wybrany etap.`);
     $('outputPanel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    draw();
   } catch (error) {
     clearGenerated();
     status(error.message, 'error');
   }
+}
+function stageFilename(stage) {
+  return `cmc-poem-etap-${String(stage.stage.number).padStart(3,'0')}-z-${String(stage.stage.total).padStart(3,'0')}.tap`;
+}
+function downloadContent(filename, content, type = 'text/plain;charset=utf-8') {
+  const blob = new Blob([content], {type});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+function allInstructions() {
+  const notes = [
+    'CMC POEM - ETAPY OBRÓBKI MACH3MILL',
+    'Każdy plik TAP jest niezależnym programem z G54 i M30.',
+    'PRZED KAŻDYM ETAPEM: zamocuj materiał i ustaw X0/Y0 G54 w odpowiednim narożniku LOKALNEJ siatki etapu.',
+    'Z0 ustaw na powierzchni materiału. Ruchu materiału i bazowania NIE wykonuje program.',
+    'Współrzędne offsetów służą wyłącznie do ustalenia położenia etapu na pełnym wzorze.',
+    'Sprawdź kierunki osi, mocowanie, możliwości frezu, zakres maszyny, symulację oraz przejazd próbny.',
+    `ORIENTACJA ${plan.orientation}; PUNKT 0,0 ${plan.origin}; RASTER ${plan.cols}x${plan.rows}`,
+    `ROZSTAW SRODKOW X${plan.width.toFixed(3)} Y${plan.height.toFixed(3)} mm; ETAPOW ${stageData.total}`,
+    `MAX OBSZAR X${stageData.areaX.toFixed(3)} Y${stageData.areaY.toFixed(3)} mm`,
+    '',
+  ];
+  stageData.stages.forEach((s,i)=>{
+    const t=s.stage;
+    notes.push(`ETAP ${t.number}/${t.total}: ${s.ones} NAWIERTÓW; `+
+      `KOLUMNY ${t.colStart+1}-${t.colEnd}; WIERSZE ${t.rowStart+1}-${t.rowEnd}; `+
+      `OSRODEK ZERA W PELNYM WZORZE X${t.offsetX.toFixed(3)} Y${t.offsetY.toFixed(3)} MM; `+
+      `OBSZAR X${t.footprintX.toFixed(3)} Y${t.footprintY.toFixed(3)} MM; `+
+      `${generatedParts[i] ? stageFilename(s) : 'BRAK PLIKU: ETAP BEZ NAWIERTOW'}`);
+  });
+  return notes.join('\n')+'\n';
 }
 
 function draw() {
@@ -119,6 +203,19 @@ function draw() {
     ctx.fill();
     if (!matrix[r][c]) { ctx.lineWidth = 1;ctx.strokeStyle = '#647779';ctx.stroke(); }
   }
+  if (stageData && stageData.total > 1) {
+    for (const s of stageData.stages) {
+      const t = s.stage;
+      const x0 = left + (t.colStart - 0.5) * step;
+      const y0 = top + (t.rowStart - 0.5) * step;
+      const x1 = left + (t.colEnd - 0.5) * step;
+      const y1 = top + (t.rowEnd - 0.5) * step;
+      const active = t.number === currentStage+1;
+      ctx.strokeStyle = active ? '#b6ecdc' : '#62716d';
+      ctx.lineWidth = active ? 2.5 : 1;
+      ctx.beginPath();ctx.moveTo(x0,y0);ctx.lineTo(x1,y0);ctx.lineTo(x1,y1);ctx.lineTo(x0,y1);ctx.lineTo(x0,y0);ctx.stroke();
+    }
+  }
   const r = plan.origin.startsWith('top') ? 0 : rows - 1;
   const c = plan.origin.endsWith('right') ? cols - 1 : 0;
   const ox = left + c * step, oy = top + r * step;
@@ -142,6 +239,14 @@ $('matrixCanvas').addEventListener('click', event => {
   update();
 });
 
+$('stageSelect').addEventListener('change', () => {
+  currentStage = Number($('stageSelect').value);
+  if (!stageData || !Number.isInteger(currentStage) || currentStage < 0 || currentStage >= stageData.total) return;
+  showStageDetails();
+  draw();
+});
+$('splitEnabled').addEventListener('change', update);
+for (const id of ['maxAreaX','maxAreaY']) $(id).addEventListener('input', update);
 for (const id of ids) {
   $(id).addEventListener(id === 'spindle' || ['orientation','origin','order','cycle'].includes(id) ? 'change' : 'input', () => {
     if (id === 'pattern') $('sourceText').value = '';
@@ -159,14 +264,16 @@ $('sampleBtn').addEventListener('click', () => {
 $('generateBtn').addEventListener('click', generate);
 $('generateBtnOutput').addEventListener('click', generate);
 $('downloadBtn').addEventListener('click', () => {
-  if (!generated || !plan) return;
-  const blob = new Blob([generated], { type: 'text/plain;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `cmc-poem-${plan.cols}x${plan.rows}-${plan.orientation}.tap`;
-  document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 2000);
+  if (!generated || !stageData) return;
+  downloadContent(stageFilename(stageData.stages[currentStage]), generated);
+});
+$('downloadAllBtn').addEventListener('click', () => {
+  if (!generatedParts.length || !stageData) return;
+  const files = stageData.stages.flatMap((s,i)=>generatedParts[i] ?
+    [{name:stageFilename(s),content:generatedParts[i]}] : []);
+  files.unshift({name:'INSTRUKCJA-ETAPY.txt',content:allInstructions()});
+  const zip = packZip(files);
+  downloadContent(`cmc-poem-etapy-${stageData.total}.zip`, zip, 'application/zip');
 });
 $('copyBtn').addEventListener('click', async () => {
   if (!generated) return;

@@ -68,3 +68,36 @@ Testowane są: parsowanie i uzupełnianie wierszy, orientacja, punkty zerowe, ko
 - `tests/gcode.test.mjs` - testy jednostkowe Node.js.
 
 Źródło składni: instrukcja *Using Mach3Mill*, Rev 1.84 (rozdział 10, zwłaszcza `G0`, `G1`, `G81`, `G98`, `G90`, `G94`).
+
+## Nowe w 1.2: dzielenie wydruku na niezależne etapy
+
+1. Wybierz **Pionowy** w polu „Układ wzoru”.
+2. Zaznacz **Podziel długi wzór na niezależne etapy**.
+3. Wprowadź **Maks. obszar X** i **Maks. obszar Y** w milimetrach. Program uwzględnia **całą średnicę wierconego otworu**, nie tylko siatkę jego środków.
+4. Kliknij **Generuj G-code**. Program podzieli siatkę na prostokątne pola robocze, oznaczy je ramkami na podglądzie i pokaże liczbę nawiertów w każdej części.
+5. Wybierz pojedynczy etap i pobierz odpowiadający mu plik `.tap`, albo kliknij **Pobierz wszystkie etapy ZIP**. Archiwum zawiera niezależne pliki oraz `INSTRUKCJA-ETAPY.txt` z wymiarami, numerami wierszy/kolumn i odniesieniami położenia każdego etapu do punktu zerowego całego wzoru.
+
+**Ważne:** każdy etap zakłada **ponowne ustawienie punktu G54 X0/Y0** w wybranym narożniku *lokalnej* siatki po przestawieniu materiału. Aplikacja nie przesuwa fizycznie osi ani materiału i nie wykonuje automatycznego bazowania. Etapy bez żadnych `1` są zachowane na mapie, ale nie powstaje dla nich plik G-code. Jeżeli obszar jest zbyt mały na średnicę narzędzia, generowanie jest blokowane. Jeśli pełny wzór przekroczy dopuszczalny limit 500 etapów, trzeba zwiększyć obszar roboczy.
+
+**Fizyczne przesuwanie materiału** wymaga własnych znaczników pozycjonujących, ograniczników lub innego powtarzalnego układu referencyjnego. Współrzędne offsetów w plikach `.tap` i instrukcji są opisem położenia w oryginalnym wzorze, **nie poleceniem przesunięcia osi CNC**. Przy wybraniu prawego lub górnego narożnika niektóre lokalne X/Y są ujemne.
+
+## Nowe w 1.2: zagłębianie spiralne (helisa)
+
+Wybierz **G3 · zagłębianie spiralne** i ustaw:
+
+- **Średnica frezu / wiertła**: rzeczywista średnica frezu czołowego.
+- **Średnica wykonywanego otworu**: średnica gotowego wyfrezowania.
+- **Zejście Z na pełen obrót**: parametr helisy (mm/obrót).
+- **Głębokość** i **Posuw** z głównego formularza.
+
+Program ustawia `G91.1` (inkrementalne I/J), `G17`, `G90` i generuje dwa półokręgi `G3` na obrót, ze stopniowo malejącym Z, do zadanej głębokości. Potem wykonuje dodatkowy płaski okrąg do wykończenia ściany, cofa się do `safeZ` i przechodzi do następnego otworu.
+
+- Dopuszczalna średnica otworu: minimum **średnica frezu + 0,1 mm** i maksimum **2 × średnica frezu**. To świadomy limit: jedna toroidalna helisa nie oczyści środka większego otworu.
+- Wymagany **frez czołowy do zagłębiania**, poprawnie dobrane parametry technologiczne i **pracujące wrzeciono**. Opcja automatycznego `M3` jest domyślnie wyłączona, zatem operator musi uruchomić wrzeciono zgodnie z procedurą maszyny.
+- Używaj tylko po sprawdzeniu pełnej trajektorii `G3` w **symulatorze odpowiedniej konfiguracji Mach3Mill**, z uwzględnieniem wersji sterownika, położenia materiału, podjazdów i zacisków.
+- To nie jest procedura wiercenia wiertłem spiralnym: interpolacja helikalna wymaga frezu do obróbki bocznej.
+
+### Dodatkowe pliki
+
+- `src/zip.mjs`: eksport plików etapów do ZIP bez zależności zewnętrznych.
+- `tests/stages-and-helix.test.mjs`: testy podziału, globalnych offsetów, G3 i struktury archiwum.
