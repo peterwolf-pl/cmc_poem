@@ -82,5 +82,9 @@ test('ZIP packs valid local and central headers and preserves UTF-8 files',()=>{
   assert.equal(view.getUint32(0,true),0x04034b50);
   assert.equal(view.getUint32(zip.length-22,true),0x06054b50);
   assert.equal(view.getUint16(zip.length-12,true),2);
+  const directorySize = view.getUint32(zip.length-10,true);
+  const directoryOffset = view.getUint32(zip.length-6,true);
+  assert.equal(directoryOffset + directorySize, zip.length - 22);
+  assert.equal(view.getUint32(directoryOffset,true),0x02014b50);
   assert(zip.length>90);
 });

@@ -41,7 +41,8 @@ export function packZip(files) {
     u16(e.name.length);u16(0);u16(0);u16(0);u16(0);u32(0);u32(e.localOffset);
     bytes(e.name);
   }
+  const cdLength = pos - cdStart;
   u32(0x06054b50);u16(0);u16(0);u16(entries.length);u16(entries.length);
-  u32(pos-cdStart);u32(cdStart);u16(0);
+  u32(cdLength);u32(cdStart);u16(0);
   return out;
 }
