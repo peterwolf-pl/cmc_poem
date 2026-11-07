@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 // Minimal DOM event harness to exercise app.mjs without dependencies or a browser.
 test('visible text input converts to UTF-8 bits, explicit generate and stale code protection', async () => {
   const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
-  for (const id of ['sourceText', 'pattern', 'convertBtn', 'generateBtn', 'generateBtnOutput']) {
+  for (const id of ['sourceText', 'pattern', 'convertBtn', 'generateBtn', 'generateBtnOutput', 'linesPerStage']) {
     assert.match(html, new RegExp(`id="${id}"`));
   }
   assert.doesNotMatch(html, /id="textSourceWrap"[^>]*hidden/);
@@ -22,7 +22,7 @@ test('visible text input converts to UTF-8 bits, explicit generate and stale cod
     setTransform(){},clearRect(){},fillText(){},beginPath(){},moveTo(){},lineTo(){},stroke(){},arc(){},fill(){},
   };
   elements.get('matrixCanvas').getContext = () => ctx;
-  for (const [id, value] of Object.entries({pitchX:'3',pitchY:'3',depth:'0.8',feed:'80',retractZ:'2',safeZ:'5',orientation:'horizontal',origin:'bottom-left',order:'serpentine',cycle:'explicit',rpm:'10000',bytesPerRow:'8',toolDiameter:'1',holeDiameter:'2',helixStep:'0.25',maxAreaX:'100',maxAreaY:'100'})) elements.get(id).value = value;
+  for (const [id, value] of Object.entries({pitchX:'3',pitchY:'3',depth:'0.8',feed:'80',retractZ:'2',safeZ:'5',orientation:'horizontal',origin:'bottom-left',order:'serpentine',cycle:'explicit',rpm:'10000',bytesPerRow:'8',toolDiameter:'1',holeDiameter:'2',helixStep:'0.25',maxAreaX:'100',maxAreaY:'100',linesPerStage:''})) elements.get(id).value = value;
   globalThis.document = {getElementById(id){assert(elements.has(id),`missing ${id}`);return elements.get(id);}};
   globalThis.window = {devicePixelRatio:1,addEventListener(){}};
   const el = id=>elements.get(id);
@@ -61,6 +61,10 @@ test('visible text input converts to UTF-8 bits, explicit generate and stale cod
     emit('maxAreaY');
     assert.match(el('stageSummary').textContent,/etapów/);
     assert.match(el('stageSelect').innerHTML,/Etap 1/);
+    el('linesPerStage').value='2';
+    emit('linesPerStage');
+    assert.match(el('stageSummary').textContent,/Podział co 2 linii/);
+    assert.equal(el('gcode').value,'');
     emit('generateBtnOutput','click');
     assert.match(el('gcode').value,/\(STAGE \d+\/\d+/);
     assert.equal(el('downloadAllBtn').disabled,false);

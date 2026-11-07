@@ -74,8 +74,9 @@ Testowane są: parsowanie i uzupełnianie wierszy, orientacja, punkty zerowe, ko
 1. Wybierz **Pionowy** w polu „Układ wzoru”.
 2. Zaznacz **Podziel długi wzór na niezależne etapy**.
 3. Wprowadź **Maks. obszar X** i **Maks. obszar Y** w milimetrach. Program uwzględnia **całą średnicę wierconego otworu**, nie tylko siatkę jego środków.
-4. Kliknij **Generuj G-code**. Program podzieli siatkę na prostokątne pola robocze, oznaczy je ramkami na podglądzie i pokaże liczbę nawiertów w każdej części.
-5. Wybierz pojedynczy etap i pobierz odpowiadający mu plik `.tap`, albo kliknij **Pobierz wszystkie etapy ZIP**. Archiwum zawiera niezależne pliki oraz `INSTRUKCJA-ETAPY.txt` z wymiarami, numerami wierszy/kolumn i odniesieniami położenia każdego etapu do punktu zerowego całego wzoru.
+4. Opcjonalnie wpisz **Podziel co N linii siatki** (np. `8`). Generator rozpocznie nowy etap po maksymalnie ośmiu wierszach siatki **już obróconej w orientację pionową**. Linie liczone są od góry. Puste pole pozostawia automatyczny podział tylko według wielkości obszaru. Jeśli maksymalna wysokość Y mieści mniej niż N wierszy, generator podzieli wcześniej, nigdy nie przekraczając limitu obszaru.
+5. Kliknij **Generuj G-code**. Program podzieli siatkę na prostokątne pola robocze, oznaczy je ramkami na podglądzie i pokaże liczbę nawiertów w każdej części.
+6. Wybierz pojedynczy etap i pobierz odpowiadający mu plik `.tap`, albo kliknij **Pobierz wszystkie etapy ZIP**. Archiwum zawiera niezależne pliki oraz `INSTRUKCJA-ETAPY.txt` z wymiarami, numerami wierszy/kolumn i odniesieniami położenia każdego etapu do punktu zerowego całego wzoru.
 
 **Ważne:** każdy etap zakłada **ponowne ustawienie punktu G54 X0/Y0** w wybranym narożniku *lokalnej* siatki po przestawieniu materiału. Aplikacja nie przesuwa fizycznie osi ani materiału i nie wykonuje automatycznego bazowania. Etapy bez żadnych `1` są zachowane na mapie, ale nie powstaje dla nich plik G-code. Jeżeli obszar jest zbyt mały na średnicę narzędzia, generowanie jest blokowane. Jeśli pełny wzór przekroczy dopuszczalny limit 500 etapów, trzeba zwiększyć obszar roboczy.
 
@@ -101,3 +102,7 @@ Program ustawia `G91.1` (inkrementalne I/J), `G17`, `G90` i generuje dwa półok
 
 - `src/zip.mjs`: eksport plików etapów do ZIP bez zależności zewnętrznych.
 - `tests/stages-and-helix.test.mjs`: testy podziału, globalnych offsetów, G3 i struktury archiwum.
+
+## Nowe w 1.3: podział po liczbie linii
+
+W trybie pionowym, przy zaznaczonym podziale na etapy, pole **Podziel co N linii siatki** ustala maksymalną liczbę kolejnych wierszy na jeden etap. Działa niezależnie od maksymalnych wymiarów, które pozostają bezwzględnym ograniczeniem rozmiaru. Przykład: 22 widoczne wiersze i `N=8` dają od góry 8+8+6 wierszy (o ile obszar Y pozwala), każdy fragment jako osobny plik `.tap`. Dla większej liczby kolumn może pojawić się dodatkowy podział w X. W instrukcji ZIP znajdziesz podaną wartość N, rzeczywistą liczbę wierszy na etap i offsety. Nie przesuwaj materiału bez sprawdzenia fizycznego pozycjonowania.

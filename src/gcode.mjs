@@ -272,7 +272,17 @@ export function buildStages(plan, options = {}) {
     ? Math.max(1, Math.min(count, Math.floor((area - featureDiameter + 1e-8) / pitch) + 1))
     : count;
   const columnsPerStage = capacity(areaX, plan.pitchX, plan.cols);
-  const rowsPerStage = capacity(areaY, plan.pitchY, plan.rows);
+  const areaRowsPerStage = capacity(areaY, plan.pitchY, plan.rows);
+  // Optional explicit split frequency counts rows of the *oriented* (displayed) grid.
+  // An empty value retains automatic size-based splitting. Area remains a hard limit.
+  let lineLimit = null;
+  if (enabled && options.linesPerStage !== undefined && options.linesPerStage !== null && String(options.linesPerStage).trim() !== '') {
+    const count = Number(options.linesPerStage);
+    if (!Number.isSafeInteger(count) || count < 1 || count > 250)
+      throw new Error('Podział co N linii: podaj liczbę całkowitą od 1 do 250.');
+    lineLimit = count;
+  }
+  const rowsPerStage = lineLimit === null ? areaRowsPerStage : Math.min(areaRowsPerStage, lineLimit);
   const countX = Math.ceil(plan.cols / columnsPerStage);
   const countY = Math.ceil(plan.rows / rowsPerStage);
   const total = countX * countY;
@@ -314,5 +324,5 @@ export function buildStages(plan, options = {}) {
     }
   }
   if (stages.reduce((n,s)=>n+s.ones,0) !== plan.ones) throw new Error('Błąd podziału: utrata nawiertów.');
-  return {stages, columnsPerStage, rowsPerStage, countX, countY, total, areaX, areaY, featureDiameter};
+  return {stages, columnsPerStage, rowsPerStage, areaRowsPerStage, lineLimit, countX, countY, total, areaX, areaY, featureDiameter};
 }

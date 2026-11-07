@@ -88,3 +88,51 @@ test('ZIP packs valid local and central headers and preserves UTF-8 files',()=>{
   assert.equal(view.getUint32(directoryOffset,true),0x02014b50);
   assert(zip.length>90);
 });
+
+
+test('manual line frequency splits oriented rows exactly as entered',()=>{
+  const p=buildPlan('1111111111111111111111\n1111111111111111111111',{...s,orientation:'vertical',pitchX:5,pitchY:5});
+  // 22 visible rows after 90-degree turn. 8+8+6; 2 columns.
+  const result=buildStages(p,{enabled:true,maxAreaX:100,maxAreaY:100,linesPerStage:8,drillDiameter:1});
+  assert.equal(p.rows,22);
+  assert.equal(result.total,3);
+  assert.equal(result.countY,3);
+  assert.equal(result.countX,1);
+  assert.equal(result.lineLimit,8);
+  assert.equal(result.rowsPerStage,8);
+  assert.deepEqual(result.stages.map(t=>t.rows),[8,8,6]);
+  assert.deepEqual(result.stages.map(t=>[t.stage.rowStart,t.stage.rowEnd]),[[0,8],[8,16],[16,22]]);
+  assert.equal(result.stages.reduce((n,st)=>n+st.ones,0),p.ones);
+});
+
+test('work-area limit wins when N rows would exceed available Y',()=>{
+  const p=buildPlan('1111111111\n1111111111',{...s,orientation:'vertical',pitchX:5,pitchY:5});
+  const result=buildStages(p,{enabled:true,maxAreaX:100,maxAreaY:11,linesPerStage:8,drillDiameter:1});
+  assert.equal(result.lineLimit,8);
+  assert.equal(result.areaRowsPerStage,3);
+  assert.equal(result.rowsPerStage,3);
+  assert.deepEqual(result.stages.map(t=>t.rows),[3,3,3,1]);
+  assert(result.stages.every(t=>t.stage.footprintY<=11));
+});
+
+test('invalid manual line counts are rejected when splitting is active',()=>{
+  const p=buildPlan('101\n111',{...s,orientation:'vertical'});
+  for (const bad of ['0','2.5','abc','-3','251','Infinity']) {
+    assert.throws(()=>buildStages(p,{enabled:true,maxAreaX:100,maxAreaY:100,linesPerStage:bad,drillDiameter:1}),/Podział co N linii/);
+  }
+  assert.equal(buildStages(p,{enabled:true,maxAreaX:100,maxAreaY:100,linesPerStage:'',drillDiameter:1}).lineLimit,null);
+  assert.equal(buildStages(p,{enabled:false,linesPerStage:'abc'}).total,1);
+});
+
+test('manual row division preserves positions for every origin and stage',()=>{
+  const matrix='10111101\n11011001\n11101111\n10110111';
+  for (const origin of ['bottom-left','bottom-right','top-left','top-right']) {
+    const plan=buildPlan(matrix,{...s,orientation:'vertical',origin,pitchX:5,pitchY:5});
+    const {stages}=buildStages(plan,{enabled:true,maxAreaX:11,maxAreaY:100,linesPerStage:3,drillDiameter:1});
+    const want=new Set(plan.holes.map(h=>`${h.x},${h.y}`));
+    const have=new Set(stages.flatMap(st=>st.holes.map(h=>`${h.x+st.stage.offsetX},${h.y+st.stage.offsetY}`)));
+    assert.deepEqual(have,want);
+    assert(stages.every(st=>st.rows<=3));
+    assert(stages.every(st=>st.stage.footprintX<=11));
+  }
+});

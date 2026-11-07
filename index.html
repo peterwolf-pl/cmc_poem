@@ -47,8 +47,9 @@
                 <div class="field-grid" id="stageDimensions">
                   <label class="field">Maks. obszar X <span>mm</span><input id="maxAreaX" type="number" min="0.1" max="1000000" step="1" value="100"></label>
                   <label class="field">Maks. obszar Y <span>mm</span><input id="maxAreaY" type="number" min="0.1" max="1000000" step="1" value="100"></label>
+                  <label class="field field-full">Podziel co N linii siatki <span>wiersze</span><input id="linesPerStage" type="number" min="1" max="250" step="1" placeholder="np. 8 (puste = automatycznie)" aria-describedby="linesPerStageHelp"></label>
                 </div>
-                <p class="hint">Limit dotyczy całego otworu wraz ze średnicą narzędzia. Każdy etap ma własne lokalne X0/Y0 w G54. Przed kolejnym plikiem przesuń i ponownie zbazuj materiał.</p>
+                <p class="hint" id="linesPerStageHelp">Liczba linii oznacza wiersze widocznej siatki <strong>po obróceniu w pion</strong>, liczone od góry. Np. 8 = nowy etap po 8 wierszach. Puste pole = automatyczny podział tylko według wymiarów. Jeżeli obszar roboczy nie mieści N wierszy, program podzieli wcześniej. Każdy etap ma własne G54 X0/Y0, które należy ustawić ponownie po przesunięciu materiału.</p>
               </div>
             </div>
           </section>
@@ -95,7 +96,7 @@
           </section>
         </div>
       </div>
-      <footer><p><strong>Bezpieczeństwo:</strong> Program zakłada Z0 na powierzchni materiału, wybrany narożnik w G54 i dodatnie Z ponad materiałem. Zawsze wykonaj symulację oraz przejazd próbny nad materiałem. Sprawdź mocowanie, średnicę narzędzia, limity osi i sterowanie wrzecionem.</p><span>CMC POEM / OFFLINE GENERATOR / v1.2</span></footer>
+      <footer><p><strong>Bezpieczeństwo:</strong> Program zakłada Z0 na powierzchni materiału, wybrany narożnik w G54 i dodatnie Z ponad materiałem. Zawsze wykonaj symulację oraz przejazd próbny nad materiałem. Sprawdź mocowanie, średnicę narzędzia, limity osi i sterowanie wrzecionem.</p><span>CMC POEM / OFFLINE GENERATOR / v1.3</span></footer>
     </main>
   </div>
   <script type="module" src="./src/app.mjs"></script>

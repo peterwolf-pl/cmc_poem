@@ -35,6 +35,7 @@ function stageOptions() {
     enabled: $('orientation').value === 'vertical' && $('splitEnabled').checked,
     maxAreaX: $('maxAreaX').value,
     maxAreaY: $('maxAreaY').value,
+    linesPerStage: $('linesPerStage').value,
     drillDiameter: $('toolDiameter').value,
   };
 }
@@ -55,7 +56,9 @@ function update() {
     $('holeStat').textContent = String(plan.ones);
     $('widthStat').textContent = `${plan.width.toFixed(2)} mm`;
     $('heightStat').textContent = `${plan.height.toFixed(2)} mm`;
-    $('stageSummary').textContent = `${stageData.total} etapów (maks. ${stageData.columnsPerStage} kolumn × ${stageData.rowsPerStage} wierszy na etap). Siatka: ${plan.width.toFixed(2)} × ${plan.height.toFixed(2)} mm między środkami.`;
+    const lineInfo = stageData.lineLimit === null ? 'Podział wg obszaru roboczego.' :
+      `Podział co ${stageData.lineLimit} linii (rzeczywiście maks. ${stageData.rowsPerStage} na etap${stageData.rowsPerStage < stageData.lineLimit ? ', ograniczenie obszaru Y' : ''}).`;
+    $('stageSummary').textContent = `${stageData.total} etapów (maks. ${stageData.columnsPerStage} kolumn × ${stageData.rowsPerStage} wierszy na etap). ${lineInfo} Siatka: ${plan.width.toFixed(2)} × ${plan.height.toFixed(2)} mm między środkami.`;
     status(`${plan.ones} nawiertów, ${stageData.total} etapów. Kliknij „Generuj G-code”. ${plan.warnings.join(' ')}`, plan.warnings.length ? 'warn' : '');
   } catch (error) {
     plan = null; stageData = null;
@@ -147,6 +150,7 @@ function allInstructions() {
     `ORIENTACJA ${plan.orientation}; PUNKT 0,0 ${plan.origin}; RASTER ${plan.cols}x${plan.rows}`,
     `ROZSTAW SRODKOW X${plan.width.toFixed(3)} Y${plan.height.toFixed(3)} mm; ETAPOW ${stageData.total}`,
     `MAX OBSZAR X${stageData.areaX.toFixed(3)} Y${stageData.areaY.toFixed(3)} mm`,
+    `PODZIAL CO N LINII SIATKI: ${stageData.lineLimit === null ? 'AUTO (WG OBSZARU)' : stageData.lineLimit}; FAKTYCZNIE MAKS. ${stageData.rowsPerStage} WIERSZY NA ETAP`,
     '',
   ];
   stageData.stages.forEach((s,i)=>{
@@ -246,7 +250,7 @@ $('stageSelect').addEventListener('change', () => {
   draw();
 });
 $('splitEnabled').addEventListener('change', update);
-for (const id of ['maxAreaX','maxAreaY']) $(id).addEventListener('input', update);
+for (const id of ['maxAreaX','maxAreaY','linesPerStage']) $(id).addEventListener('input', update);
 for (const id of ids) {
   $(id).addEventListener(id === 'spindle' || ['orientation','origin','order','cycle'].includes(id) ? 'change' : 'input', () => {
     if (id === 'pattern') $('sourceText').value = '';
