@@ -22,7 +22,7 @@ test('visible text input converts to UTF-8 bits, explicit generate and stale cod
     setTransform(){},clearRect(){},fillText(){},beginPath(){},moveTo(){},lineTo(){},stroke(){},arc(){},fill(){},
   };
   elements.get('matrixCanvas').getContext = () => ctx;
-  for (const [id, value] of Object.entries({pitchX:'3',pitchY:'3',depth:'0.8',feed:'80',travelMode:'rapid',travelFeed:'600',retractZ:'2',safeZ:'5',orientation:'horizontal',origin:'bottom-left',order:'serpentine',cycle:'explicit',rpm:'10000',bytesPerRow:'8',toolDiameter:'1',holeDiameter:'2',helixStep:'0.25',maxAreaX:'100',maxAreaY:'100',linesPerStage:''})) elements.get(id).value = value;
+  for (const [id, value] of Object.entries({pitchX:'3',pitchY:'3',depth:'0.8',feed:'80',travelMode:'rapid',travelFeed:'600',retractZ:'2',safeZ:'5',orientation:'horizontal',origin:'bottom-left',order:'serpentine',cycle:'explicit',rpm:'10000',bytesPerRow:'8',toolDiameter:'1',holeDiameter:'2',helixStep:'0.25',maxAreaX:'100',maxAreaY:'100',marginX:'0',marginY:'0',linesPerStage:''})) elements.get(id).value = value;
   globalThis.document = {getElementById(id){assert(elements.has(id),`missing ${id}`);return elements.get(id);}};
   globalThis.window = {devicePixelRatio:1,addEventListener(){}};
   const el = id=>elements.get(id);
@@ -31,6 +31,23 @@ test('visible text input converts to UTF-8 bits, explicit generate and stale cod
     await import('../src/app.mjs');
     assert.equal(el('gcode').value,'');
     assert(el('downloadBtn').disabled);
+    // Safe work area fields always remain visible, even in horizontal mode.
+    assert.equal(el('stageDimensions').hidden, false);
+    assert.equal(el('stageOptions').hidden, false);
+    el('maxAreaY').value='50';
+    emit('maxAreaY');
+    assert.match(el('workAreaSummary').textContent,/Pole użyteczne: 100.00 × 50.00 mm/);
+    el('marginY').value='5';
+    emit('marginY');
+    assert.match(el('workAreaSummary').textContent,/100.00 × 40.00 mm/);
+    el('splitEnabled').checked=false;
+    emit('splitEnabled','change');
+    assert.equal(el('stageDimensions').hidden, false);
+    el('splitEnabled').checked=true;
+    emit('splitEnabled','change');
+    el('maxAreaY').value='100';
+    el('marginY').value='0';
+    emit('maxAreaY');
     // One-byte UTF-8 must become a vertical eight-column ribbon by default.
     el('bytesPerRow').value = '1';
     emit('bytesPerRow');

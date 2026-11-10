@@ -132,7 +132,7 @@ export function buildPlan(source, settings = {}) {
   if (safeZ < retractZ) throw new Error('Bezpieczne Z musi być większe lub równe poziomowi R.');
   const rpm = o.spindle ? positiveNumber(o.rpm, 'Obroty wrzeciona') : null;
   // The circular toolpath must clear the centre of the pocket as well as the edge.
-  let toolDiameter = 0;
+  let toolDiameter = o.cycle === 'helix' ? 0 : positiveNumber(o.toolDiameter, 'Średnica narzędzia');
   let holeDiameter = 0;
   let helixStep = 0;
   if (o.cycle === 'helix') {
@@ -304,28 +304,53 @@ export function buildStages(plan, options = {}) {
   const enabled = Boolean(options.enabled);
   const featureDiameter = plan.cycle === 'helix' ? plan.holeDiameter :
     positiveNumber(options.drillDiameter === undefined ? (plan.toolDiameter || DEFAULTS.toolDiameter) : options.drillDiameter, 'Średnica narzędzia');
-  const areaX = enabled ? positiveNumber(options.maxAreaX, 'Maksymalny obszar X') : plan.width + featureDiameter;
-  const areaY = enabled ? positiveNumber(options.maxAreaY, 'Maksymalny obszar Y') : plan.height + featureDiameter;
-  if (enabled && (featureDiameter > areaX + 1e-9 || featureDiameter > areaY + 1e-9))
-    throw new Error('Średnica otworu/narzędzia przekracza maksymalny obszar etapu.');
-  const capacity = (area, pitch, count) => enabled
-    ? Math.max(1, Math.min(count, Math.floor((area - featureDiameter + 1e-8) / pitch) + 1))
-    : count;
-  const areaColumnsPerStage = capacity(areaX, plan.pitchX, plan.cols);
-  const areaRowsPerStage = capacity(areaY, plan.pitchY, plan.rows);
-  // All stages follow Y; the work width X must fit the complete strip.
-  // N is the maximum number of visible output rows per stage in both layouts.
+
+  // A supplied physical work rectangle ALWAYS bounds the cutting envelope,
+  // even if the operator turns automatic splitting off.
+  const supplied = v => v !== null && v !== undefined && String(v).trim() !== '';
+  const workDimension = (v, fallback, label) => {
+    if (supplied(v)) return positiveNumber(v, label);
+    if (enabled) throw new Error(`${label}: podaj wymiar bezpiecznego pola pracy.`);
+    return fallback;
+  };
+  const areaX = workDimension(options.maxAreaX, plan.width + featureDiameter, 'Szerokość pola X');
+  const areaY = workDimension(options.maxAreaY, plan.height + featureDiameter, 'Długość pola Y');
+  const margin = (v,label) => {
+    if (!supplied(v)) return 0;
+    const n = Number(v);
+    if (!Number.isFinite(n) || n < 0 || n > 1000000)
+      throw new Error(`${label}: podaj liczbę nieujemną (mm).`);
+    return n;
+  };
+  const marginX = margin(options.marginX,'Margines X');
+  const marginY = margin(options.marginY,'Margines Y');
+  const usableX = areaX - 2 * marginX;
+  const usableY = areaY - 2 * marginY;
+  if (usableX <= 0 || usableY <= 0)
+    throw new Error('Marginesy pochłaniają cały obszar roboczy X lub Y.');
+  if (featureDiameter > usableX + 1e-9 || featureDiameter > usableY + 1e-9)
+    throw new Error('Średnica otworu/narzędzia przekracza obszar użyteczny po odjęciu marginesów.');
+
+  const capacity = (area,pitch,count) => Math.max(1,
+    Math.min(count, Math.floor((area - featureDiameter + 1e-8) / pitch) + 1));
+  const areaColumnsPerStage = capacity(usableX, plan.pitchX, plan.cols);
+  const areaRowsPerStage = capacity(usableY, plan.pitchY, plan.rows);
+  if (areaColumnsPerStage < plan.cols)
+    throw new Error('Wzór jest za szeroki dla bezpiecznego pola X. Zmniejsz rozstaw X, szerokość siatki, średnicę otworu lub margines X. Materiał przesuwamy wyłącznie wzdłuż Y.');
+  if (!enabled && areaRowsPerStage < plan.rows)
+    throw new Error('Wzór przekracza bezpieczną wysokość Y. Włącz podział na etapy albo zwiększ dostępny obszar Y.');
+
+  // Optional number of rows is a SECOND, stricter boundary. Empty -> split
+  // only on crossing the actual toolpath envelope after subtracting margins.
   let lineLimit = null;
-  if (enabled && options.linesPerStage !== undefined && options.linesPerStage !== null && String(options.linesPerStage).trim() !== '') {
+  if (enabled && supplied(options.linesPerStage)) {
     const count = Number(options.linesPerStage);
     if (!Number.isSafeInteger(count) || count < 1 || count > 250)
       throw new Error('Podział co N linii: podaj liczbę całkowitą od 1 do 250.');
     lineLimit = count;
   }
-  if (enabled && areaColumnsPerStage < plan.cols)
-    throw new Error('Wzór jest za szeroki dla limitu X. Zmniejsz bajty na wiersz, rozstaw X lub średnicę narzędzia. Podział etapów jest możliwy tylko wzdłuż Y.');
   const columnsPerStage = plan.cols;
-  const rowsPerStage = lineLimit === null ? areaRowsPerStage : Math.min(areaRowsPerStage, lineLimit);
+  const rowsPerStage = !enabled ? plan.rows : lineLimit === null ? areaRowsPerStage : Math.min(areaRowsPerStage, lineLimit);
   const lineAxis = 'Y';
   const actualLinesPerStage = rowsPerStage;
   const countX = Math.ceil(plan.cols / columnsPerStage);
@@ -371,5 +396,5 @@ export function buildStages(plan, options = {}) {
     }
   }
   if (stages.reduce((n,s)=>n+s.ones,0) !== plan.ones) throw new Error('Błąd podziału: utrata nawiertów.');
-  return {stages, columnsPerStage, rowsPerStage, areaColumnsPerStage, areaRowsPerStage, lineLimit, lineAxis, actualLinesPerStage, countX, countY, total, areaX, areaY, featureDiameter};
+  return {stages, columnsPerStage, rowsPerStage, areaColumnsPerStage, areaRowsPerStage, lineLimit, lineAxis, actualLinesPerStage, countX, countY, total, areaX, areaY, marginX, marginY, usableX, usableY, featureDiameter};
 }

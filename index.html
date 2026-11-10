@@ -43,19 +43,24 @@
               <p class="hint field-full" id="orientationHint">W obu układach kolejne bajty lub grupy bitów biegną pionowo w dół materiału, po osi Y. W poziomym 8 bitów bajtu biegnie w rzędzie X; w pionowym 8 bitów biegnie w kolumnie Y. Przy 1 bajcie na wiersz: poziomy = 8 kolumn, pionowy = 1 kolumna. Ręczna macierz 0/1 również rozwija się pionowo.</p>
               <label class="field field-full">Punkt 0,0 na siatce<select id="origin"><option value="bottom-left">Lewy dolny narożnik</option><option value="bottom-right">Prawy dolny narożnik</option><option value="top-left">Lewy górny narożnik</option><option value="top-right">Prawy górny narożnik</option></select></label>
               <label class="field field-full">Kolejność przejścia<select id="order"><option value="serpentine">Wężyk · krótsze przejazdy</option><option value="rows">Wierszami · od lewej do prawej</option></select></label>
-              <div id="stageOptions" class="field-full stage-settings">
-                <label class="toggle-label stage-toggle"><input type="checkbox" id="splitEnabled" checked> Podziel wzór na niezależne etapy (poziomy i pionowy)</label>
-                <div class="field-grid" id="stageDimensions">
-                  <label class="field">Maks. obszar X <span>mm</span><input id="maxAreaX" type="number" min="0.1" max="1000000" step="1" value="100"></label>
-                  <label class="field">Maks. obszar Y <span>mm</span><input id="maxAreaY" type="number" min="0.1" max="1000000" step="1" value="100"></label>
-                  <label class="field field-full">Podziel co N wierszy w osi Y <span>liczba</span><input id="linesPerStage" type="number" min="1" max="250" step="1" placeholder="np. 8 (puste = automatycznie)" aria-describedby="linesPerStageHelp"></label>
-                </div>
-                <p class="hint" id="linesPerStageHelp">W <strong>obu układach</strong> podział następuje po N wierszach widocznej siatki, <strong>wyłącznie wzdłuż Y</strong>. Puste pole = automatyczny podział według maksymalnej wysokości Y. Cała szerokość X musi zmieścić się w obszarze roboczym, inaczej generator zgłosi błąd. Po przesunięciu materiału ustaw ponownie G54 X0/Y0 lokalnego etapu.</p>
-              </div>
             </div>
           </section>
+          <section class="panel work-area-panel" id="stageOptions">
+            <div class="panel-head"><span class="step">03</span><h2>Bezpieczny obszar pracy</h2><span class="micro-label">POZIOMY I PIONOWY</span></div>
+            <p class="work-intro">Wpisz rozmiar dostępnego pola maszyny X/Y i margines bezpieczeństwa. Ograniczenia działają zawsze, niezależnie od orientacji bitów i podziału etapów.</p>
+            <div class="field-grid" id="stageDimensions">
+              <label class="field">Szerokość pola X <span>mm</span><input id="maxAreaX" type="number" min="0.1" max="1000000" step="1" value="100"></label>
+              <label class="field">Długość pola Y <span>mm</span><input id="maxAreaY" type="number" min="0.1" max="1000000" step="1" value="100"></label>
+              <label class="field">Margines X na stronę <span>mm</span><input id="marginX" type="number" min="0" max="1000000" step="0.1" value="0"></label>
+              <label class="field">Margines Y na każdą stronę <span>mm</span><input id="marginY" type="number" min="0" max="1000000" step="0.1" value="0"></label>
+            </div>
+            <div id="workAreaSummary" class="work-area-summary" aria-live="polite">Pole użyteczne: 100 × 100 mm.</div>
+            <label class="toggle-label stage-toggle work-stage-toggle"><input type="checkbox" id="splitEnabled" checked> Podziel wzór na niezależne etapy (poziomy i pionowy)</label>
+            <label class="field">Opcjonalnie: podziel co N wierszy w osi Y <span>wiersze</span><input id="linesPerStage" type="number" min="1" max="250" step="1" placeholder="puste = tylko według granicy pola Y" aria-describedby="linesPerStageHelp"></label>
+            <p class="hint" id="linesPerStageHelp"><strong>Automatyczny podział po przekroczeniu bezpiecznej granicy Y.</strong> Każdy fragment zachowuje pełną szerokość X. Jeśli cała szerokość z uwzględnieniem średnicy otworu przekracza bezpieczne X, program nie wygeneruje kodu. Jeśli wyłączysz podział, wzór musi zmieścić się w całości w polu X/Y. Przed każdym etapem przesuń materiał wzdłuż Y i ponownie ustaw lokalne G54.</p>
+          </section>
           <section class="panel">
-            <div class="panel-head"><span class="step">03</span><h2>Parametry wiercenia</h2></div>
+            <div class="panel-head"><span class="step">04</span><h2>Parametry wiercenia</h2></div>
             <div class="field-grid">
               <label class="field">Głębokość poniżej Z0 <span>mm</span><input id="depth" type="number" min="0.001" max="1000000" step="0.1" value="0.8"></label>
               <label class="field">Posuw roboczy F <span>mm/min</span><input id="feed" type="number" min="0.001" max="1000000" step="1" value="80"></label>
@@ -78,14 +83,15 @@
         </div>
         <div class="preview-column">
           <section class="panel preview-panel">
-            <div class="panel-head"><span class="step">04</span><h2>Podgląd nawiertów</h2><span class="micro-label">WIDOK Z GÓRY</span></div>
+            <div class="panel-head"><span class="step">05</span><h2>Podgląd nawiertów</h2><span class="micro-label">WIDOK Z GÓRY</span></div>
             <div class="canvas-frame"><canvas id="matrixCanvas" aria-label="Podgląd macierzy wierceń - kliknij, aby zmienić pole"></canvas><div class="canvas-axis">X → &nbsp; Y ↑</div></div>
+            <div class="stage-preview-legend"><span><i></i>Granice etapów po osi Y</span><span>Cały pas X musi mieścić się w bezpiecznym polu</span></div>
             <div id="stageSummary" class="stage-summary" aria-live="polite">Etapy: 1</div>
             <div class="stats" aria-live="polite"><div><small>SIATKA</small><strong id="gridStat">-</strong></div><div><small>NAWIERTY</small><strong id="holeStat">-</strong></div><div><small>SZEROKOŚĆ X</small><strong id="widthStat">-</strong></div><div><small>WYSOKOŚĆ Y</small><strong id="heightStat">-</strong></div></div>
             <p class="dimension-note">Wymiary dotyczą skrajnych <strong>środków</strong> nawiertów. Nie uwzględniają średnicy narzędzia ani marginesu materiału.</p>
           </section>
           <section class="panel output-panel" id="outputPanel">
-            <div class="panel-head"><span class="step">05</span><h2>Program Mach3Mill</h2><span class="micro-label">.TAP / .NC</span></div>
+            <div class="panel-head"><span class="step">06</span><h2>Program Mach3Mill</h2><span class="micro-label">.TAP / .NC</span></div>
             <button type="button" id="generateBtnOutput" class="btn btn-primary generate-btn output-generate-btn">▶ Generuj G-code</button>
             <div id="status" class="status" role="status" aria-live="polite">Ustaw parametry i kliknij Generuj G-code.</div>
             <div class="stage-switcher">
@@ -100,7 +106,7 @@
           </section>
         </div>
       </div>
-      <footer><p><strong>Bezpieczeństwo:</strong> Program zakłada Z0 na powierzchni materiału, wybrany narożnik w G54 i dodatnie Z ponad materiałem. Zawsze wykonaj symulację oraz przejazd próbny nad materiałem. Sprawdź mocowanie, średnicę narzędzia, limity osi i sterowanie wrzecionem.</p><span>CMC POEM / OFFLINE GENERATOR / v1.5</span></footer>
+      <footer><p><strong>Bezpieczeństwo:</strong> Program zakłada Z0 na powierzchni materiału, wybrany narożnik w G54 i dodatnie Z ponad materiałem. Zawsze wykonaj symulację oraz przejazd próbny nad materiałem. Sprawdź mocowanie, średnicę narzędzia, limity osi i sterowanie wrzecionem.</p><span>CMC POEM / OFFLINE GENERATOR / v1.6</span></footer>
     </main>
   </div>
   <script type="module" src="./src/app.mjs"></script>

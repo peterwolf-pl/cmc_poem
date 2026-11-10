@@ -109,3 +109,15 @@ Uruchom `npm test`, potem sprawdź każdy etap w symulatorze Mach3Mill. Sprawdź
 - `src/app.mjs`: interfejs, podgląd, eksport.
 - `src/zip.mjs`: eksport ZIP bez zależności.
 - `tests/*.test.mjs`: testy logiki, etapów, posuwów i UI.
+
+## v1.6: Bezpieczny obszar pracy dla poziomego i pionowego
+
+Sekcja **Bezpieczny obszar pracy** jest stale widoczna i nie zależy od układu. Ustaw fizyczną szerokość pola X, długość Y oraz niezależne marginesy X/Y (każdy margines jest odejmowany z dwóch przeciwległych stron). Pole użyteczne ma wymiar `X - 2*marginX` × `Y - 2*marginY`. Do obliczeń wchodzi pełna średnica otworu (lub narzędzia), więc również jego krawędzie muszą mieścić się w polu użytecznym.
+
+- W obu układach program dzieli wzór wyłącznie wzdłuż osi Y po przekroczeniu bezpiecznego pola (uwzględniając marginesy).
+- Opcjonalne `Podziel co N wierszy` może wymusić krótsze etapy; puste pole nie narzuca dodatkowego ograniczenia.
+- Jeśli szerokość przekracza bezpieczne X, program zgłasza błąd zamiast dzielić w poprzek materiału.
+- Po wyłączeniu podziału limity X/Y nadal obowiązują: zbyt długiego wzoru nie można wyeksportować jako jednej niebezpiecznej operacji.
+- Podgląd zaznacza granice kolejnych etapów przerywaną linią.
+
+**Ustawienie G54:** wartości pola roboczego i marginesów określają rozmiar dostępnego miejsca, ale nie przesuwają automatycznie G54. Ustaw lokalne zero każdego etapu tak, aby krawędzie całej trajektorii narzędzia mieściły się wewnątrz marginesów, z uwzględnieniem promienia frezu i wybranego narożnika. Po przesunięciu materiału wzdłuż Y ponownie wyzeruj zgodnie z oznaczeniami. Przed uruchomieniem każdej partii wykonaj symulację i przejazd próbny nad detalem.

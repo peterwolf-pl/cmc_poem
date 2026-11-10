@@ -34,3 +34,20 @@ textarea,input,select{border:1px solid #384448;background:#0c1214;color:#edf3f0;
 .download-all:hover:not(:disabled){filter:brightness(1.15)}
 @media(max-width:650px){.stage-settings,.helix-settings{padding:12px}.stage-settings .field-grid{grid-template-columns:1fr}}
 #stageDimensions[hidden],#travelFeedWrap[hidden]{display:none!important}
+
+/* v1.6: the safe machine envelope is ALWAYS visible, in either layout. */
+.work-area-panel {border-color:#527a6b; background:#152120}
+.work-area-panel .panel-head{margin-bottom:12px}
+.work-intro {font-size:12px;color:#c8dbd4;line-height:1.65;margin:0 0 18px}
+.work-area-panel #stageDimensions {display:grid !important; margin:0 0 14px}
+.work-area-summary {border:1px solid #507b6b;background:#0a1c17;color:#dcf6e6;padding:11px 12px;border-radius:5px;font-size:12px;line-height:1.5;margin:8px 0 18px}
+.work-stage-toggle{margin:12px 0 15px}
+.work-area-panel .field>input{width:100%}
+.stage-preview-legend {display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:11px;color:#c6d0cc;margin:12px 0}
+.stage-preview-legend i {display:inline-block;width:17px;height:2px;border-top:2px dashed #ddac6d;margin-right:7px;vertical-align:middle}
+@media(max-width:650px){.work-area-panel .field-grid{grid-template-columns:1fr 1fr}}
+
+/* Keep download/generate buttons compact inside the tall output panel. */
+.output-panel > .btn {flex:0 0 auto; min-height:46px}
+.output-panel .action-row .btn{flex:1 1 0;min-height:44px}
+.output-panel #gcode{min-height:280px}

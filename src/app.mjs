@@ -40,6 +40,8 @@ function stageOptions() {
     enabled: $('splitEnabled').checked,
     maxAreaX: $('maxAreaX').value,
     maxAreaY: $('maxAreaY').value,
+    marginX: $('marginX').value,
+    marginY: $('marginY').value,
     linesPerStage: $('linesPerStage').value,
     drillDiameter: $('toolDiameter').value,
   };
@@ -48,7 +50,8 @@ function update() {
   $('rpm').disabled = !$('spindle').checked;
   const isHelix = $('cycle').value === 'helix';
   $('stageOptions').hidden = false;
-  $('stageDimensions').hidden = !$('splitEnabled').checked;
+  // Work limits are always visible and enforced, even when stage splitting is disabled.
+  $('stageDimensions').hidden = false;
   $('travelFeedWrap').hidden = $('travelMode').value !== 'controlled';
   $('helixOptions').hidden = !isHelix;
   clearGenerated();
@@ -64,11 +67,13 @@ function update() {
     const lineInfo = stageData.lineLimit === null ? 'Podział wzdłuż Y wg obszaru roboczego.' :
       `Podział co ${stageData.lineLimit} wierszy wzdłuż Y (maks. ${stageData.actualLinesPerStage} na etap${stageData.actualLinesPerStage < stageData.lineLimit ? ', ograniczenie obszaru Y' : ''}).`;
     $('stageSummary').textContent = `${stageData.total} etapów (maks. ${stageData.columnsPerStage} kolumn × ${stageData.rowsPerStage} wierszy na etap). ${lineInfo} Siatka: ${plan.width.toFixed(2)} × ${plan.height.toFixed(2)} mm między środkami.`;
+    $('workAreaSummary').textContent = `Pole użyteczne: ${stageData.usableX.toFixed(2)} × ${stageData.usableY.toFixed(2)} mm. Margines X: ${stageData.marginX.toFixed(2)} mm na stronę, Y: ${stageData.marginY.toFixed(2)} mm na każdą stronę. Podział: ${stageData.total} etapów wzdłuż Y.`;
     status(`${plan.ones} nawiertów, ${stageData.total} etapów. Kliknij „Generuj G-code”. ${plan.warnings.join(' ')}`, plan.warnings.length ? 'warn' : '');
   } catch (error) {
     plan = null; stageData = null;
     for (const id of ['gridStat', 'holeStat', 'widthStat', 'heightStat']) $(id).textContent = '-';
     $('stageSummary').textContent = 'Błąd parametrów etapów.';
+    $('workAreaSummary').textContent = `Błąd bezpiecznego pola pracy: ${error.message}`;
     $('stageDetail').textContent = '';
     $('stageSelect').innerHTML = '';
     status(error.message, 'error');
@@ -160,6 +165,8 @@ function allInstructions() {
     `ORIENTACJA ${plan.orientation}; PUNKT 0,0 ${plan.origin}; RASTER ${plan.cols}x${plan.rows}`,
     `ROZSTAW SRODKOW X${plan.width.toFixed(3)} Y${plan.height.toFixed(3)} mm; ETAPOW ${stageData.total}`,
     `MAX OBSZAR X${stageData.areaX.toFixed(3)} Y${stageData.areaY.toFixed(3)} mm`,
+    `MARGINES X ${stageData.marginX.toFixed(3)} MM NA STRONE; Y ${stageData.marginY.toFixed(3)} MM NA KONIEC`,
+    `OBSZAR UZYTECZNY X${stageData.usableX.toFixed(3)} Y${stageData.usableY.toFixed(3)} MM`,
     `PODZIAL CO N LINII SIATKI: ${stageData.lineLimit === null ? 'AUTO (WG OBSZARU)' : stageData.lineLimit}; OS ${stageData.lineAxis}; FAKTYCZNIE MAKS. ${stageData.actualLinesPerStage} POZYCJI NA ETAP`,
     `POSUW ROBOCZY F${plan.feed.toFixed(3)} MM/MIN; POSUW JALOWY ${plan.travelMode === 'controlled' ? `G1 F${plan.travelFeed.toFixed(3)}` : 'G0 (WG MACH3)'}`,
     '',
@@ -230,6 +237,14 @@ function draw() {
       ctx.lineWidth = active ? 2.5 : 1;
       ctx.beginPath();ctx.moveTo(x0,y0);ctx.lineTo(x1,y0);ctx.lineTo(x1,y1);ctx.lineTo(x0,y1);ctx.lineTo(x0,y0);ctx.stroke();
     }
+    // Material repositioning boundary between consecutive Y stages.
+    ctx.setLineDash?.([5, 4]);
+    for (const s of stageData.stages.slice(0, -1)) {
+      const y = top + (s.stage.rowEnd - 0.5) * step;
+      ctx.beginPath();ctx.moveTo(12, y);ctx.lineTo(w - 12, y);
+      ctx.strokeStyle = '#ddac6d';ctx.lineWidth = 1.5;ctx.stroke();
+    }
+    ctx.setLineDash?.([]);
   }
   const r = plan.origin.startsWith('top') ? 0 : rows - 1;
   const c = plan.origin.endsWith('right') ? cols - 1 : 0;
@@ -262,7 +277,7 @@ $('stageSelect').addEventListener('change', () => {
   draw();
 });
 $('splitEnabled').addEventListener('change', update);
-for (const id of ['maxAreaX','maxAreaY','linesPerStage']) $(id).addEventListener('input', update);
+for (const id of ['maxAreaX','maxAreaY','marginX','marginY','linesPerStage']) $(id).addEventListener('input', update);
 for (const id of ids) {
   $(id).addEventListener(id === 'spindle' || ['orientation','origin','order','cycle','travelMode'].includes(id) ? 'change' : 'input', () => {
     if (id === 'orientation') orientationExplicit = true;
