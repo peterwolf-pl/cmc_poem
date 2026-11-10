@@ -7,6 +7,7 @@ export const DEFAULTS = Object.freeze({
   retractZ: 2,
   safeZ: 5,
   orientation: 'horizontal',
+  sourceMode: 'binary',
   origin: 'bottom-left',
   order: 'serpentine',
   cycle: 'explicit',
@@ -21,6 +22,7 @@ const ORIGINS = ['bottom-left', 'bottom-right', 'top-left', 'top-right'];
 const ORIENTATIONS = ['horizontal', 'vertical'];
 const ORDERS = ['rows', 'serpentine'];
 const CYCLES = ['explicit', 'g81', 'helix'];
+const SOURCE_MODES = ['binary', 'text'];
 
 /** Read a grid of 0 and 1. Spaces and tabs can separate bits. Blank lines are ignored.
  * Short rows are padded with 0 on the right and reported as a warning.
@@ -109,6 +111,7 @@ export function buildPlan(source, settings = {}) {
   for (const [label, value, choices] of [
     ['Punkt zerowy', o.origin, ORIGINS],
     ['Orientacja', o.orientation, ORIENTATIONS],
+    ['Rodzaj wejścia', o.sourceMode, SOURCE_MODES],
     ['Kolejność', o.order, ORDERS],
     ['Tryb G-code', o.cycle, CYCLES],
   ]) if (!choices.includes(value)) throw new Error(`${label}: nieznana opcja.`);
@@ -139,7 +142,11 @@ export function buildPlan(source, settings = {}) {
   if (o.spindle && !Number.isInteger(rpm)) throw new Error('Obroty wrzeciona muszą być liczbą całkowitą.');
 
   const parsed = parsePattern(source);
-  const matrix = orientedMatrix(parsed.matrix, o.orientation);
+  // Manually entered matrices retain legacy behaviour: vertical rotates 90° CW.
+  // UTF-8 text is already formatted as byte rows. Vertical MUST preserve
+  // these rows; horizontal turns the byte sequence across the machine's X axis.
+  const rotate = o.sourceMode === 'text' ? o.orientation === 'horizontal' : o.orientation === 'vertical';
+  const matrix = orientedMatrix(parsed.matrix, rotate ? 'vertical' : 'horizontal');
   const rows = matrix.length;
   const cols = matrix[0].length;
   const width = (cols - 1) * pitchX;
@@ -182,6 +189,7 @@ export function generateGcode(plan) {
     `(PATTERN ${p.cols} COLUMNS X ${p.rows} ROWS - ${p.ones} HOLES)`,
     `(SIZE BETWEEN EXTREME CENTERS X${fmt(p.width)} Y${fmt(p.height)} MM)`,
     `(ORIGIN ${p.origin.toUpperCase()} - ORIENTATION ${p.orientation.toUpperCase()})`,
+    `(PATTERN SOURCE ${p.sourceMode === 'text' ? 'UTF8-BYTE-ROWS' : 'BINARY-MATRIX'})`,
     ...(p.stage ? [
       `(STAGE ${p.stage.number}/${p.stage.total} - GRID COL ${p.stage.colStart + 1}-${p.stage.colEnd} ROW ${p.stage.rowStart + 1}-${p.stage.rowEnd})`,
       `(ORIGINAL PATTERN OFFSET OF STAGE G54 X${fmt(p.stage.offsetX)} Y${fmt(p.stage.offsetY)} MM)`,
@@ -246,10 +254,11 @@ export function generateGcode(plan) {
 }
 
 /** Map a clicked preview cell back into the original, unrotated text grid. */
-export function toggleCell(source, orientation, displayRow, displayCol) {
+export function toggleCell(source, orientation, displayRow, displayCol, sourceMode = 'binary') {
   const original = parsePattern(source);
-  const r = orientation === 'vertical' ? original.rows - 1 - displayCol : displayRow;
-  const c = orientation === 'vertical' ? displayRow : displayCol;
+  const rotate = sourceMode === 'text' ? orientation === 'horizontal' : orientation === 'vertical';
+  const r = rotate ? original.rows - 1 - displayCol : displayRow;
+  const c = rotate ? displayRow : displayCol;
   if (r < 0 || r >= original.rows || c < 0 || c >= original.cols) throw new Error('Pole jest poza siatką.');
   original.matrix[r][c] = original.matrix[r][c] ? 0 : 1;
   return original.matrix.map(row => row.join('')).join('\n');

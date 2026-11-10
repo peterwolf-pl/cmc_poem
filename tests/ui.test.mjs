@@ -31,6 +31,24 @@ test('visible text input converts to UTF-8 bits, explicit generate and stale cod
     await import('../src/app.mjs');
     assert.equal(el('gcode').value,'');
     assert(el('downloadBtn').disabled);
+    // One-byte UTF-8 must become a vertical eight-column ribbon by default.
+    el('bytesPerRow').value = '1';
+    emit('bytesPerRow');
+    el('sourceText').value = 'ABCD';
+    emit('sourceText');
+    assert.equal(el('orientation').value, 'vertical');
+    assert.equal(el('gridStat').textContent, '8 × 4');
+    assert.equal(el('widthStat').textContent, '21.00 mm');
+    assert.equal(el('heightStat').textContent, '9.00 mm');
+    emit('generateBtn','click');
+    assert.match(el('gcode').value, /PATTERN 8 COLUMNS X 4 ROWS/);
+    el('orientation').value = 'horizontal';
+    emit('orientation', 'change');
+    assert.equal(el('gridStat').textContent, '4 × 8');
+    assert(el('downloadBtn').disabled);
+    el('bytesPerRow').value = '8';
+    emit('bytesPerRow');
+    assert.equal(el('orientation').value, 'horizontal');
     el('splitEnabled').checked=true;
     el('sourceText').value='Ał';
     emit('sourceText');

@@ -12,10 +12,15 @@ let geometry = null;
 let stageData = null;
 let generatedParts = [];
 let currentStage = 0;
+// Text-mode bit rows grow downward in the vertical CNC layout. Binary-mode
+// preserves the original 90-degree rotation convention for existing projects.
+let sourceMode = 'binary';
+let orientationExplicit = false;
 
 function readSettings() {
   const result = {};
   for (const key of ids.slice(1)) result[key] = key === 'spindle' ? $(key).checked : $(key).value;
+  result.sourceMode = sourceMode;
   return result;
 }
 function status(message, type = '') {
@@ -100,6 +105,11 @@ function convertText(explicit = false) {
       return;
     }
     $('pattern').value = textToBinary(source, $('bytesPerRow').value);
+    sourceMode = 'text';
+    // Default one-byte ribbons to a vertical material feed, unless the
+    // operator explicitly chose a different orientation.
+    if (Number($('bytesPerRow').value) === 1 && !orientationExplicit)
+      $('orientation').value = 'vertical';
     update();
     if (explicit && plan) status(`Tekst zamieniony na ${plan.cols} × ${plan.rows} bitów. Kliknij „Generuj G-code”.`);
   } catch (error) {
@@ -239,7 +249,7 @@ $('matrixCanvas').addEventListener('click', event => {
   if (r < 0 || r >= rows || c < 0 || c >= cols) return;
   if (Math.hypot(x - left - c * step, y - top - r * step) > Math.max(12, Math.min(22, step * .5))) return;
   $('sourceText').value = '';
-  $('pattern').value = toggleCell($('pattern').value, $('orientation').value, r, c);
+  $('pattern').value = toggleCell($('pattern').value, $('orientation').value, r, c, sourceMode);
   update();
 });
 
@@ -253,6 +263,7 @@ $('splitEnabled').addEventListener('change', update);
 for (const id of ['maxAreaX','maxAreaY','linesPerStage']) $(id).addEventListener('input', update);
 for (const id of ids) {
   $(id).addEventListener(id === 'spindle' || ['orientation','origin','order','cycle'].includes(id) ? 'change' : 'input', () => {
+    if (id === 'orientation') orientationExplicit = true;
     if (id === 'pattern') $('sourceText').value = '';
     update();
   });
@@ -262,6 +273,7 @@ $('bytesPerRow').addEventListener('input', () => { if ($('sourceText').value) co
 $('convertBtn').addEventListener('click', () => convertText(true));
 $('sampleBtn').addEventListener('click', () => {
   $('sourceText').value = '';
+  sourceMode = 'binary';
   $('pattern').value = sample;
   update();
 });

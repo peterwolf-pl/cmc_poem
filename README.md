@@ -18,7 +18,7 @@ Następnie otwórz w przeglądarce `http://localhost:8080`. Możesz też hostowa
 - Wprowadzanie siatki zer i jedynek, ze spacjami lub bez. Każdy wiersz tekstu reprezentuje osobny rząd.
 - Widoczne pole zwykłego tekstu: wpisz tekst lub wiersz, a aplikacja automatycznie zakoduje go jako UTF-8 (8 bitów na bajt). Dostępny jest także przycisk **Zamień tekst na 0/1**, od 1 do 31 bajtów na wiersz i automatyczne zawijanie. Puste linie tworzą rzędy bez nawiertów.
 - Klikanie w podglądzie przełącza `0/1` i aktualizuje kod.
-- Układ poziomy lub pionowy. Pionowy obraca tekstową macierz o **90° zgodnie z ruchem wskazówek zegara**.
+- Dla zwykłego tekstu UTF-8: **Pionowy** pozostawia bajty (8 bitów w wierszu) ułożone jeden pod drugim w osi Y, **Poziomy** obraca układ o 90° i umieszcza kolejne bajty w osi X. Przy 1 bajcie na wiersz generator domyślnie wybiera układ pionowy, chyba że użytkownik ręcznie wybrał inny. Dla ręcznie wpisanej macierzy 0/1 zachowano poprzednią semantykę: poziomy = bez obrotu, pionowy = obrót o 90° zgodnie z ruchem wskazówek zegara.
 - Punkt `(0,0)` w jednym z czterech narożników siatki.
 - Niezależne odstępy X i Y w milimetrach.
 - Obliczanie liczby otworów i wymiarów pomiędzy skrajnymi środkami nawiertów.
@@ -106,3 +106,7 @@ Program ustawia `G91.1` (inkrementalne I/J), `G17`, `G90` i generuje dwa półok
 ## Nowe w 1.3: podział po liczbie linii
 
 W trybie pionowym, przy zaznaczonym podziale na etapy, pole **Podziel co N linii siatki** ustala maksymalną liczbę kolejnych wierszy na jeden etap. Działa niezależnie od maksymalnych wymiarów, które pozostają bezwzględnym ograniczeniem rozmiaru. Przykład: 22 widoczne wiersze i `N=8` dają od góry 8+8+6 wierszy (o ile obszar Y pozwala), każdy fragment jako osobny plik `.tap`. Dla większej liczby kolumn może pojawić się dodatkowy podział w X. W instrukcji ZIP znajdziesz podaną wartość N, rzeczywistą liczbę wierszy na etap i offsety. Nie przesuwaj materiału bez sprawdzenia fizycznego pozycjonowania.
+
+## Poprawka v1.4: 1 bajt na wiersz i kierunek wzoru
+
+Wpisz zwykły tekst, ustaw `Bajtów UTF-8 na wiersz = 1`. Aplikacja automatycznie wybiera **Pionowy** (o ile wcześniej nie zmieniono orientacji ręcznie). Każdy kolejny bajt stanowi **nowy wiersz 8 bitów**, więc wzór rośnie w dół; nie wykonujemy już dodatkowego obrotu 90° przy generowaniu G-code z tekstu. Na przykład `AB` to macierz 8 × 2, a nie 2 × 8. Po zmianie na **Poziomy** wzór jest obrócony i rośnie w prawo. Ręczne matryce 0/1 nadal działają jak przed zmianą. Sprawdź orientację i numery etapów przed frezowaniem; wcześniejsze projekty wyprowadzone z tekstu mogą mieć inne współrzędne.

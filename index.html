@@ -39,7 +39,8 @@
             <div class="field-grid">
               <label class="field">Odstęp X <span>mm</span><input id="pitchX" type="number" min="0.001" max="1000000" step="0.1" value="3"></label>
               <label class="field">Odstęp Y <span>mm</span><input id="pitchY" type="number" min="0.001" max="1000000" step="0.1" value="3"></label>
-              <label class="field field-full">Układ wzoru<select id="orientation"><option value="horizontal">Poziomy · zgodnie z tekstem</option><option value="vertical">Pionowy · obrót 90° w prawo</option></select></label>
+              <label class="field field-full">Układ wzoru<select id="orientation"><option value="horizontal">Poziomy · UTF-8 wzdłuż X / matryca 0-1 bez obrotu</option><option value="vertical">Pionowy · UTF-8 wzdłuż Y / matryca 0-1 obrót 90°</option></select></label>
+              <p class="hint field-full" id="orientationHint">Tekst UTF-8: w układzie pionowym kolejne bajty układają się w dół (przy 1 bajcie na wiersz masz 8 kolumn); w poziomym biegną w prawo. Ręcznie wprowadzona macierz 0/1 zachowuje dotychczasowe obracanie o 90°.</p>
               <label class="field field-full">Punkt 0,0 na siatce<select id="origin"><option value="bottom-left">Lewy dolny narożnik</option><option value="bottom-right">Prawy dolny narożnik</option><option value="top-left">Lewy górny narożnik</option><option value="top-right">Prawy górny narożnik</option></select></label>
               <label class="field field-full">Kolejność przejścia<select id="order"><option value="serpentine">Wężyk · krótsze przejazdy</option><option value="rows">Wierszami · od lewej do prawej</option></select></label>
               <div id="stageOptions" class="field-full stage-settings" hidden>
@@ -96,7 +97,7 @@
           </section>
         </div>
       </div>
-      <footer><p><strong>Bezpieczeństwo:</strong> Program zakłada Z0 na powierzchni materiału, wybrany narożnik w G54 i dodatnie Z ponad materiałem. Zawsze wykonaj symulację oraz przejazd próbny nad materiałem. Sprawdź mocowanie, średnicę narzędzia, limity osi i sterowanie wrzecionem.</p><span>CMC POEM / OFFLINE GENERATOR / v1.3</span></footer>
+      <footer><p><strong>Bezpieczeństwo:</strong> Program zakłada Z0 na powierzchni materiału, wybrany narożnik w G54 i dodatnie Z ponad materiałem. Zawsze wykonaj symulację oraz przejazd próbny nad materiałem. Sprawdź mocowanie, średnicę narzędzia, limity osi i sterowanie wrzecionem.</p><span>CMC POEM / OFFLINE GENERATOR / v1.4</span></footer>
     </main>
   </div>
   <script type="module" src="./src/app.mjs"></script>
