@@ -22,7 +22,7 @@ test('visible text input converts to UTF-8 bits, explicit generate and stale cod
     setTransform(){},clearRect(){},fillText(){},beginPath(){},moveTo(){},lineTo(){},stroke(){},arc(){},fill(){},
   };
   elements.get('matrixCanvas').getContext = () => ctx;
-  for (const [id, value] of Object.entries({pitchX:'3',pitchY:'3',depth:'0.8',feed:'80',retractZ:'2',safeZ:'5',orientation:'horizontal',origin:'bottom-left',order:'serpentine',cycle:'explicit',rpm:'10000',bytesPerRow:'8',toolDiameter:'1',holeDiameter:'2',helixStep:'0.25',maxAreaX:'100',maxAreaY:'100',linesPerStage:''})) elements.get(id).value = value;
+  for (const [id, value] of Object.entries({pitchX:'3',pitchY:'3',depth:'0.8',feed:'80',travelMode:'rapid',travelFeed:'600',retractZ:'2',safeZ:'5',orientation:'horizontal',origin:'bottom-left',order:'serpentine',cycle:'explicit',rpm:'10000',bytesPerRow:'8',toolDiameter:'1',holeDiameter:'2',helixStep:'0.25',maxAreaX:'100',maxAreaY:'100',linesPerStage:''})) elements.get(id).value = value;
   globalThis.document = {getElementById(id){assert(elements.has(id),`missing ${id}`);return elements.get(id);}};
   globalThis.window = {devicePixelRatio:1,addEventListener(){}};
   const el = id=>elements.get(id);
@@ -37,15 +37,17 @@ test('visible text input converts to UTF-8 bits, explicit generate and stale cod
     el('sourceText').value = 'ABCD';
     emit('sourceText');
     assert.equal(el('orientation').value, 'vertical');
-    assert.equal(el('gridStat').textContent, '8 × 4');
-    assert.equal(el('widthStat').textContent, '21.00 mm');
-    assert.equal(el('heightStat').textContent, '9.00 mm');
+    assert.equal(el('gridStat').textContent, '1 × 32');
+    assert.equal(el('widthStat').textContent, '0.00 mm');
+    assert.equal(el('heightStat').textContent, '93.00 mm');
     emit('generateBtn','click');
-    assert.match(el('gcode').value, /PATTERN 8 COLUMNS X 4 ROWS/);
+    assert.match(el('gcode').value, /PATTERN 1 COLUMNS X 32 ROWS/);
     el('orientation').value = 'horizontal';
     emit('orientation', 'change');
-    assert.equal(el('gridStat').textContent, '4 × 8');
+    assert.equal(el('gridStat').textContent, '8 × 4');
     assert(el('downloadBtn').disabled);
+    el('maxAreaX').value = '1000';
+    emit('maxAreaX');
     el('bytesPerRow').value = '8';
     emit('bytesPerRow');
     assert.equal(el('orientation').value, 'horizontal');
@@ -81,7 +83,7 @@ test('visible text input converts to UTF-8 bits, explicit generate and stale cod
     assert.match(el('stageSelect').innerHTML,/Etap 1/);
     el('linesPerStage').value='2';
     emit('linesPerStage');
-    assert.match(el('stageSummary').textContent,/Podział co 2 linii/);
+    assert.match(el('stageSummary').textContent,/Podział co 2 wierszy wzdłuż Y/);
     assert.equal(el('gcode').value,'');
     emit('generateBtnOutput','click');
     assert.match(el('gcode').value,/\(STAGE \d+\/\d+/);

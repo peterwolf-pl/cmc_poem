@@ -17,13 +17,13 @@ Następnie otwórz w przeglądarce `http://localhost:8080`. Możesz też hostowa
 
 - Wprowadzanie siatki zer i jedynek, ze spacjami lub bez. Każdy wiersz tekstu reprezentuje osobny rząd.
 - Widoczne pole zwykłego tekstu: wpisz tekst lub wiersz, a aplikacja automatycznie zakoduje go jako UTF-8 (8 bitów na bajt). Dostępny jest także przycisk **Zamień tekst na 0/1**, od 1 do 31 bajtów na wiersz i automatyczne zawijanie. Puste linie tworzą rzędy bez nawiertów.
-- Klikanie w podglądzie przełącza `0/1` i aktualizuje kod.
-- Dla zwykłego tekstu UTF-8: **Pionowy** pozostawia bajty (8 bitów w wierszu) ułożone jeden pod drugim w osi Y, **Poziomy** obraca układ o 90° i umieszcza kolejne bajty w osi X. Przy 1 bajcie na wiersz generator domyślnie wybiera układ pionowy, chyba że użytkownik ręcznie wybrał inny. Dla ręcznie wpisanej macierzy 0/1 zachowano poprzednią semantykę: poziomy = bez obrotu, pionowy = obrót o 90° zgodnie z ruchem wskazówek zegara.
+- Klikanie w podglądzie przełącza `0/1`; po zmianie należy ponownie wygenerować kod.
+- Oba układy rosną wzdłuż Y: w poziomym 8 bitów bajtu leży w rzędzie X, w pionowym 8 bitów leży w kolumnie Y. Przy 1 bajcie na wiersz aplikacja domyślnie wybiera pionowy (chyba że operator zmienił go ręcznie).
 - Punkt `(0,0)` w jednym z czterech narożników siatki.
 - Niezależne odstępy X i Y w milimetrach.
 - Obliczanie liczby otworów i wymiarów pomiędzy skrajnymi środkami nawiertów.
 - Głębokość poniżej Z0, posuw, poziom podejścia R, bezpieczne Z.
-- Eksport dwóch wariantów: jawne ruchy `G0/G1` lub cykl wiercenia `G81` z `G98`.
+- Eksport G-code: ruchy `G0/G1`, cykl `G81/G98` lub helisa `G3`.
 - Podgląd siatki odświeża się na bieżąco, natomiast przycisk **Generuj G-code** uruchamia generowanie programu CNC. Po zmianie parametrów wcześniejszy kod jest usuwany, aby nie pobrać nieaktualnego pliku.
 - Kolejność wierszami lub wężykiem. Gotowy plik `.tap` lub kopiowanie G-code.
 - Opcjonalne `S... M3` i `M5`; domyślnie generator **nie uruchamia wrzeciona**.
@@ -69,44 +69,43 @@ Testowane są: parsowanie i uzupełnianie wierszy, orientacja, punkty zerowe, ko
 
 Źródło składni: instrukcja *Using Mach3Mill*, Rev 1.84 (rozdział 10, zwłaszcza `G0`, `G1`, `G81`, `G98`, `G90`, `G94`).
 
-## Nowe w 1.2: dzielenie wydruku na niezależne etapy
+## CMC POEM v1.5: obie orientacje pionowym pasem
 
-1. Wybierz **Pionowy** w polu „Układ wzoru”.
-2. Zaznacz **Podziel długi wzór na niezależne etapy**.
-3. Wprowadź **Maks. obszar X** i **Maks. obszar Y** w milimetrach. Program uwzględnia **całą średnicę wierconego otworu**, nie tylko siatkę jego środków.
-4. Opcjonalnie wpisz **Podziel co N linii siatki** (np. `8`). Generator rozpocznie nowy etap po maksymalnie ośmiu wierszach siatki **już obróconej w orientację pionową**. Linie liczone są od góry. Puste pole pozostawia automatyczny podział tylko według wielkości obszaru. Jeśli maksymalna wysokość Y mieści mniej niż N wierszy, generator podzieli wcześniej, nigdy nie przekraczając limitu obszaru.
-5. Kliknij **Generuj G-code**. Program podzieli siatkę na prostokątne pola robocze, oznaczy je ramkami na podglądzie i pokaże liczbę nawiertów w każdej części.
-6. Wybierz pojedynczy etap i pobierz odpowiadający mu plik `.tap`, albo kliknij **Pobierz wszystkie etapy ZIP**. Archiwum zawiera niezależne pliki oraz `INSTRUKCJA-ETAPY.txt` z wymiarami, numerami wierszy/kolumn i odniesieniami położenia każdego etapu do punktu zerowego całego wzoru.
+Poziomy i pionowy opisują położenie bitów, a **nie kierunek transportu materiału**. W obu układach kolejne bajty/grupy rosną wzdłuż Y.
 
-**Ważne:** każdy etap zakłada **ponowne ustawienie punktu G54 X0/Y0** w wybranym narożniku *lokalnej* siatki po przestawieniu materiału. Aplikacja nie przesuwa fizycznie osi ani materiału i nie wykonuje automatycznego bazowania. Etapy bez żadnych `1` są zachowane na mapie, ale nie powstaje dla nich plik G-code. Jeżeli obszar jest zbyt mały na średnicę narzędzia, generowanie jest blokowane. Jeśli pełny wzór przekroczy dopuszczalny limit 500 etapów, trzeba zwiększyć obszar roboczy.
+- Poziomy: dla `ABCD` i 1 bajta na wiersz powstaje siatka 8 kolumn X i 4 wiersze Y.
+- Pionowy: dla tego samego tekstu powstaje siatka 1 kolumny X i 32 wierszy Y.
+- Dla większej liczby bajtów na wiersz, w pionowym układzie każdy bajt tworzy osobną kolumnę po 8 bitów, kolejne grupy przechodzą w dół.
+- Ręczny kod 0/1 ma w poziomym trybie kolejne wiersze w dół, a w pionowym układzie jego bity przebiegają pionowo. Dla wierszy podzielnych przez 8 bity są ułożone w sąsiadujących kolumnach bajtów.
 
-**Fizyczne przesuwanie materiału** wymaga własnych znaczników pozycjonujących, ograniczników lub innego powtarzalnego układu referencyjnego. Współrzędne offsetów w plikach `.tap` i instrukcji są opisem położenia w oryginalnym wzorze, **nie poleceniem przesunięcia osi CNC**. Przy wybraniu prawego lub górnego narożnika niektóre lokalne X/Y są ujemne.
+## Ograniczniki oraz etapy, zawsze wzdłuż Y
 
-## Nowe w 1.2: zagłębianie spiralne (helisa)
+1. Włącz `Podziel wzór na niezależne etapy` w dowolnej orientacji.
+2. Podaj maksymalny obszar X i Y. Program uwzględnia średnicę otworu lub wiertła.
+3. Wpisz opcjonalnie `Podziel co N wierszy w osi Y`. Puste pole oznacza automatyczny podział według maksymalnej wysokości Y.
+4. Wygeneruj oddzielne programy `.tap` lub pobierz ZIP wraz z instrukcją i offsetami wszystkich etapów.
 
-Wybierz **G3 · zagłębianie spiralne** i ustaw:
+**Nie ma podziału wzdłuż X.** Jeśli pas jest szerszy od dopuszczalnego X, generator odrzuca plan zamiast tworzyć boczne etapy. W każdym pliku trzeba ponownie ustawić lokalne G54 X0/Y0 w wybranym narożniku fragmentu po przesunięciu materiału. Program nie wykonuje pozycjonowania materiału.
 
-- **Średnica frezu / wiertła**: rzeczywista średnica frezu czołowego.
-- **Średnica wykonywanego otworu**: średnica gotowego wyfrezowania.
-- **Zejście Z na pełen obrót**: parametr helisy (mm/obrót).
-- **Głębokość** i **Posuw** z głównego formularza.
+## Osobne posuwy
 
-Program ustawia `G91.1` (inkrementalne I/J), `G17`, `G90` i generuje dwa półokręgi `G3` na obrót, ze stopniowo malejącym Z, do zadanej głębokości. Potem wykonuje dodatkowy płaski okrąg do wykończenia ściany, cofa się do `safeZ` i przechodzi do następnego otworu.
+- Posuw roboczy F w mm/min dotyczy nawiercenia oraz helisy.
+- Szybki ruch jałowy XY: `G0`, z prędkością określoną w konfiguracji Mach3, niezależnie od F.
+- Kontrolowany ruch jałowy XY: `G1` z oddzielnym `Posuw jałowy XY F`, na wysokości bezpiecznego Z.
+- Ruchy Z w trybie jałowym nadal używają `G0`.
+- Kontrolowany posuw XY jest niedostępny razem z cyklem `G81`, ponieważ cykl sam pozycjonuje narzędzie.
 
-- Dopuszczalna średnica otworu: minimum **średnica frezu + 0,1 mm** i maksimum **2 × średnica frezu**. To świadomy limit: jedna toroidalna helisa nie oczyści środka większego otworu.
-- Wymagany **frez czołowy do zagłębiania**, poprawnie dobrane parametry technologiczne i **pracujące wrzeciono**. Opcja automatycznego `M3` jest domyślnie wyłączona, zatem operator musi uruchomić wrzeciono zgodnie z procedurą maszyny.
-- Używaj tylko po sprawdzeniu pełnej trajektorii `G3` w **symulatorze odpowiedniej konfiguracji Mach3Mill**, z uwzględnieniem wersji sterownika, położenia materiału, podjazdów i zacisków.
-- To nie jest procedura wiercenia wiertłem spiralnym: interpolacja helikalna wymaga frezu do obróbki bocznej.
+## Helisa G3
 
-### Dodatkowe pliki
+Trzeci tryb obróbki to zagłębianie spiralne `G3`, `G91.1` (inkrementalne I/J). Ustaw średnicę narzędzia, średnicę otworu i zejście na obrót, głębokość i posuw. Generator wykorzystuje dwa półokręgi na obrót i okrąg wykańczający. Średnica wykonywanego otworu musi mieścić się między `D frezu + 0,1 mm` a `2 × D frezu`. Wymagany jest frez umożliwiający zagłębianie.
 
-- `src/zip.mjs`: eksport plików etapów do ZIP bez zależności zewnętrznych.
-- `tests/stages-and-helix.test.mjs`: testy podziału, globalnych offsetów, G3 i struktury archiwum.
+## Kontrola bezpieczeństwa
 
-## Nowe w 1.3: podział po liczbie linii
+Uruchom `npm test`, potem sprawdź każdy etap w symulatorze Mach3Mill. Sprawdź kierunki osi, G54, ustawienie Z0 na powierzchni, bezpieczne wysokości, korekcję długości po `G49`, narzędzie, uchwyty oraz mechanikę maszyny. Wykonaj próbny przejazd nad materiałem. **Zmiana orientacji względem wcześniejszych wersji wymaga nowej symulacji**. Generator nie był testowany na rzeczywistej maszynie.
 
-W trybie pionowym, przy zaznaczonym podziale na etapy, pole **Podziel co N linii siatki** ustala maksymalną liczbę kolejnych wierszy na jeden etap. Działa niezależnie od maksymalnych wymiarów, które pozostają bezwzględnym ograniczeniem rozmiaru. Przykład: 22 widoczne wiersze i `N=8` dają od góry 8+8+6 wierszy (o ile obszar Y pozwala), każdy fragment jako osobny plik `.tap`. Dla większej liczby kolumn może pojawić się dodatkowy podział w X. W instrukcji ZIP znajdziesz podaną wartość N, rzeczywistą liczbę wierszy na etap i offsety. Nie przesuwaj materiału bez sprawdzenia fizycznego pozycjonowania.
+## Pliki
 
-## Poprawka v1.4: 1 bajt na wiersz i kierunek wzoru
-
-Wpisz zwykły tekst, ustaw `Bajtów UTF-8 na wiersz = 1`. Aplikacja automatycznie wybiera **Pionowy** (o ile wcześniej nie zmieniono orientacji ręcznie). Każdy kolejny bajt stanowi **nowy wiersz 8 bitów**, więc wzór rośnie w dół; nie wykonujemy już dodatkowego obrotu 90° przy generowaniu G-code z tekstu. Na przykład `AB` to macierz 8 × 2, a nie 2 × 8. Po zmianie na **Poziomy** wzór jest obrócony i rośnie w prawo. Ręczne matryce 0/1 nadal działają jak przed zmianą. Sprawdź orientację i numery etapów przed frezowaniem; wcześniejsze projekty wyprowadzone z tekstu mogą mieć inne współrzędne.
+- `src/gcode.mjs`: parsowanie, pozycje, etapy Y, G-code.
+- `src/app.mjs`: interfejs, podgląd, eksport.
+- `src/zip.mjs`: eksport ZIP bez zależności.
+- `tests/*.test.mjs`: testy logiki, etapów, posuwów i UI.

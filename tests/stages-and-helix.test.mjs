@@ -7,16 +7,16 @@ const s = {pitchX:5,pitchY:10,depth:1.0,feed:75,retractZ:2,safeZ:6,toolDiameter:
 test('stage splitting respects maximum work rectangle including tool size',()=>{
   const plan=buildPlan('1111\n1111\n1111\n1111',{...s,orientation:'vertical'});
   const result=buildStages(plan,{enabled:true,maxAreaX:11,maxAreaY:21,drillDiameter:1});
-  assert.equal(result.total,4);
-  assert.equal(result.countX,2);
-  assert.equal(result.countY,2);
-  assert.deepEqual(result.stages.map(st=>st.ones),[9,3,3,1]);
-  assert.deepEqual(result.stages.map(st=>[st.stage.offsetX,st.stage.offsetY]),[[0,10],[15,10],[0,0],[15,0]]);
+  assert.equal(result.total,6);
+  assert.equal(result.countX,1);
+  assert.equal(result.countY,6);
+  assert.deepEqual(result.stages.map(st=>st.ones),[3,3,3,3,3,1]);
+  assert.deepEqual(result.stages.map(st=>[st.stage.offsetX,st.stage.offsetY]),[[0,130],[0,100],[0,70],[0,40],[0,10],[0,0]]);
   for(const st of result.stages){
     assert(st.stage.footprintX<=11+1e-9);
     assert(st.stage.footprintY<=21+1e-9);
     const code=generateGcode(st);
-    assert.match(code,/\(STAGE \d\/4/);
+    assert.match(code,/\(STAGE \d\/6/);
     assert.match(code,/G54/);
     assert.match(code,/\nM30\n$/);
     assert.equal((code.match(/G1 Z-/g)||[]).length,st.ones);
@@ -91,8 +91,8 @@ test('ZIP packs valid local and central headers and preserves UTF-8 files',()=>{
 
 
 test('manual line frequency splits oriented rows exactly as entered',()=>{
-  const p=buildPlan('1111111111111111111111\n1111111111111111111111',{...s,orientation:'vertical',pitchX:5,pitchY:5});
-  // 22 visible rows after 90-degree turn. 8+8+6; 2 columns.
+  const p=buildPlan(Array(22).fill('11').join('\n'),{...s,orientation:'horizontal',pitchX:5,pitchY:5});
+  // 22 visible Y rows, 8+8+6; 2 columns.
   const result=buildStages(p,{enabled:true,maxAreaX:100,maxAreaY:100,linesPerStage:8,drillDiameter:1});
   assert.equal(p.rows,22);
   assert.equal(result.total,3);
@@ -106,7 +106,7 @@ test('manual line frequency splits oriented rows exactly as entered',()=>{
 });
 
 test('work-area limit wins when N rows would exceed available Y',()=>{
-  const p=buildPlan('1111111111\n1111111111',{...s,orientation:'vertical',pitchX:5,pitchY:5});
+  const p=buildPlan(Array(10).fill('11').join('\n'),{...s,orientation:'horizontal',pitchX:5,pitchY:5});
   const result=buildStages(p,{enabled:true,maxAreaX:100,maxAreaY:11,linesPerStage:8,drillDiameter:1});
   assert.equal(result.lineLimit,8);
   assert.equal(result.areaRowsPerStage,3);

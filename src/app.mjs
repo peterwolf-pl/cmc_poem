@@ -2,7 +2,7 @@ import { buildPlan, buildStages, generateGcode, toggleCell, textToBinary } from 
 import { packZip } from './zip.mjs';
 
 const $ = id => document.getElementById(id);
-const ids = ['pattern', 'pitchX', 'pitchY', 'depth', 'feed', 'retractZ', 'safeZ', 'orientation', 'origin', 'order', 'cycle', 'spindle', 'rpm', 'toolDiameter', 'holeDiameter', 'helixStep'];
+const ids = ['pattern', 'pitchX', 'pitchY', 'depth', 'feed', 'travelMode', 'travelFeed', 'retractZ', 'safeZ', 'orientation', 'origin', 'order', 'cycle', 'spindle', 'rpm', 'toolDiameter', 'holeDiameter', 'helixStep'];
 const sample = ['0010100', '0111110', '1111111', '1111111', '0111110', '0011100', '0001000'].join('\n');
 $('pattern').value = sample;
 $('sourceText').value = '';
@@ -37,7 +37,7 @@ function clearGenerated() {
 }
 function stageOptions() {
   return {
-    enabled: $('orientation').value === 'vertical' && $('splitEnabled').checked,
+    enabled: $('splitEnabled').checked,
     maxAreaX: $('maxAreaX').value,
     maxAreaY: $('maxAreaY').value,
     linesPerStage: $('linesPerStage').value,
@@ -46,10 +46,10 @@ function stageOptions() {
 }
 function update() {
   $('rpm').disabled = !$('spindle').checked;
-  const isVertical = $('orientation').value === 'vertical';
   const isHelix = $('cycle').value === 'helix';
-  $('stageOptions').hidden = !isVertical;
-  $('stageDimensions').hidden = !isVertical || !$('splitEnabled').checked;
+  $('stageOptions').hidden = false;
+  $('stageDimensions').hidden = !$('splitEnabled').checked;
+  $('travelFeedWrap').hidden = $('travelMode').value !== 'controlled';
   $('helixOptions').hidden = !isHelix;
   clearGenerated();
   try {
@@ -61,8 +61,8 @@ function update() {
     $('holeStat').textContent = String(plan.ones);
     $('widthStat').textContent = `${plan.width.toFixed(2)} mm`;
     $('heightStat').textContent = `${plan.height.toFixed(2)} mm`;
-    const lineInfo = stageData.lineLimit === null ? 'Podział wg obszaru roboczego.' :
-      `Podział co ${stageData.lineLimit} linii (rzeczywiście maks. ${stageData.rowsPerStage} na etap${stageData.rowsPerStage < stageData.lineLimit ? ', ograniczenie obszaru Y' : ''}).`;
+    const lineInfo = stageData.lineLimit === null ? 'Podział wzdłuż Y wg obszaru roboczego.' :
+      `Podział co ${stageData.lineLimit} wierszy wzdłuż Y (maks. ${stageData.actualLinesPerStage} na etap${stageData.actualLinesPerStage < stageData.lineLimit ? ', ograniczenie obszaru Y' : ''}).`;
     $('stageSummary').textContent = `${stageData.total} etapów (maks. ${stageData.columnsPerStage} kolumn × ${stageData.rowsPerStage} wierszy na etap). ${lineInfo} Siatka: ${plan.width.toFixed(2)} × ${plan.height.toFixed(2)} mm między środkami.`;
     status(`${plan.ones} nawiertów, ${stageData.total} etapów. Kliknij „Generuj G-code”. ${plan.warnings.join(' ')}`, plan.warnings.length ? 'warn' : '');
   } catch (error) {
@@ -160,7 +160,8 @@ function allInstructions() {
     `ORIENTACJA ${plan.orientation}; PUNKT 0,0 ${plan.origin}; RASTER ${plan.cols}x${plan.rows}`,
     `ROZSTAW SRODKOW X${plan.width.toFixed(3)} Y${plan.height.toFixed(3)} mm; ETAPOW ${stageData.total}`,
     `MAX OBSZAR X${stageData.areaX.toFixed(3)} Y${stageData.areaY.toFixed(3)} mm`,
-    `PODZIAL CO N LINII SIATKI: ${stageData.lineLimit === null ? 'AUTO (WG OBSZARU)' : stageData.lineLimit}; FAKTYCZNIE MAKS. ${stageData.rowsPerStage} WIERSZY NA ETAP`,
+    `PODZIAL CO N LINII SIATKI: ${stageData.lineLimit === null ? 'AUTO (WG OBSZARU)' : stageData.lineLimit}; OS ${stageData.lineAxis}; FAKTYCZNIE MAKS. ${stageData.actualLinesPerStage} POZYCJI NA ETAP`,
+    `POSUW ROBOCZY F${plan.feed.toFixed(3)} MM/MIN; POSUW JALOWY ${plan.travelMode === 'controlled' ? `G1 F${plan.travelFeed.toFixed(3)}` : 'G0 (WG MACH3)'}`,
     '',
   ];
   stageData.stages.forEach((s,i)=>{
@@ -250,6 +251,7 @@ $('matrixCanvas').addEventListener('click', event => {
   if (Math.hypot(x - left - c * step, y - top - r * step) > Math.max(12, Math.min(22, step * .5))) return;
   $('sourceText').value = '';
   $('pattern').value = toggleCell($('pattern').value, $('orientation').value, r, c, sourceMode);
+  sourceMode = 'binary';
   update();
 });
 
@@ -262,9 +264,9 @@ $('stageSelect').addEventListener('change', () => {
 $('splitEnabled').addEventListener('change', update);
 for (const id of ['maxAreaX','maxAreaY','linesPerStage']) $(id).addEventListener('input', update);
 for (const id of ids) {
-  $(id).addEventListener(id === 'spindle' || ['orientation','origin','order','cycle'].includes(id) ? 'change' : 'input', () => {
+  $(id).addEventListener(id === 'spindle' || ['orientation','origin','order','cycle','travelMode'].includes(id) ? 'change' : 'input', () => {
     if (id === 'orientation') orientationExplicit = true;
-    if (id === 'pattern') $('sourceText').value = '';
+    if (id === 'pattern') { $('sourceText').value = ''; sourceMode = 'binary'; }
     update();
   });
 }

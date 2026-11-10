@@ -39,18 +39,18 @@
             <div class="field-grid">
               <label class="field">Odstęp X <span>mm</span><input id="pitchX" type="number" min="0.001" max="1000000" step="0.1" value="3"></label>
               <label class="field">Odstęp Y <span>mm</span><input id="pitchY" type="number" min="0.001" max="1000000" step="0.1" value="3"></label>
-              <label class="field field-full">Układ wzoru<select id="orientation"><option value="horizontal">Poziomy · UTF-8 wzdłuż X / matryca 0-1 bez obrotu</option><option value="vertical">Pionowy · UTF-8 wzdłuż Y / matryca 0-1 obrót 90°</option></select></label>
-              <p class="hint field-full" id="orientationHint">Tekst UTF-8: w układzie pionowym kolejne bajty układają się w dół (przy 1 bajcie na wiersz masz 8 kolumn); w poziomym biegną w prawo. Ręcznie wprowadzona macierz 0/1 zachowuje dotychczasowe obracanie o 90°.</p>
+              <label class="field field-full">Układ wzoru<select id="orientation"><option value="horizontal">Poziomy · bity w rzędzie wzdłuż X, kolejne rzędy w dół Y</option><option value="vertical">Pionowy · bity bajtu w kolumnie Y, kolejne bajty w dół Y</option></select></label>
+              <p class="hint field-full" id="orientationHint">W obu układach kolejne bajty lub grupy bitów biegną pionowo w dół materiału, po osi Y. W poziomym 8 bitów bajtu biegnie w rzędzie X; w pionowym 8 bitów biegnie w kolumnie Y. Przy 1 bajcie na wiersz: poziomy = 8 kolumn, pionowy = 1 kolumna. Ręczna macierz 0/1 również rozwija się pionowo.</p>
               <label class="field field-full">Punkt 0,0 na siatce<select id="origin"><option value="bottom-left">Lewy dolny narożnik</option><option value="bottom-right">Prawy dolny narożnik</option><option value="top-left">Lewy górny narożnik</option><option value="top-right">Prawy górny narożnik</option></select></label>
               <label class="field field-full">Kolejność przejścia<select id="order"><option value="serpentine">Wężyk · krótsze przejazdy</option><option value="rows">Wierszami · od lewej do prawej</option></select></label>
-              <div id="stageOptions" class="field-full stage-settings" hidden>
-                <label class="toggle-label stage-toggle"><input type="checkbox" id="splitEnabled" checked> Podziel długi wzór na niezależne etapy</label>
+              <div id="stageOptions" class="field-full stage-settings">
+                <label class="toggle-label stage-toggle"><input type="checkbox" id="splitEnabled" checked> Podziel wzór na niezależne etapy (poziomy i pionowy)</label>
                 <div class="field-grid" id="stageDimensions">
                   <label class="field">Maks. obszar X <span>mm</span><input id="maxAreaX" type="number" min="0.1" max="1000000" step="1" value="100"></label>
                   <label class="field">Maks. obszar Y <span>mm</span><input id="maxAreaY" type="number" min="0.1" max="1000000" step="1" value="100"></label>
-                  <label class="field field-full">Podziel co N linii siatki <span>wiersze</span><input id="linesPerStage" type="number" min="1" max="250" step="1" placeholder="np. 8 (puste = automatycznie)" aria-describedby="linesPerStageHelp"></label>
+                  <label class="field field-full">Podziel co N wierszy w osi Y <span>liczba</span><input id="linesPerStage" type="number" min="1" max="250" step="1" placeholder="np. 8 (puste = automatycznie)" aria-describedby="linesPerStageHelp"></label>
                 </div>
-                <p class="hint" id="linesPerStageHelp">Liczba linii oznacza wiersze widocznej siatki <strong>po obróceniu w pion</strong>, liczone od góry. Np. 8 = nowy etap po 8 wierszach. Puste pole = automatyczny podział tylko według wymiarów. Jeżeli obszar roboczy nie mieści N wierszy, program podzieli wcześniej. Każdy etap ma własne G54 X0/Y0, które należy ustawić ponownie po przesunięciu materiału.</p>
+                <p class="hint" id="linesPerStageHelp">W <strong>obu układach</strong> podział następuje po N wierszach widocznej siatki, <strong>wyłącznie wzdłuż Y</strong>. Puste pole = automatyczny podział według maksymalnej wysokości Y. Cała szerokość X musi zmieścić się w obszarze roboczym, inaczej generator zgłosi błąd. Po przesunięciu materiału ustaw ponownie G54 X0/Y0 lokalnego etapu.</p>
               </div>
             </div>
           </section>
@@ -58,9 +58,12 @@
             <div class="panel-head"><span class="step">03</span><h2>Parametry wiercenia</h2></div>
             <div class="field-grid">
               <label class="field">Głębokość poniżej Z0 <span>mm</span><input id="depth" type="number" min="0.001" max="1000000" step="0.1" value="0.8"></label>
-              <label class="field">Posuw F <span>mm/min</span><input id="feed" type="number" min="0.001" max="1000000" step="1" value="80"></label>
+              <label class="field">Posuw roboczy F <span>mm/min</span><input id="feed" type="number" min="0.001" max="1000000" step="1" value="80"></label>
               <label class="field">Poziom podejścia R <span>mm</span><input id="retractZ" type="number" min="0.001" max="1000000" step="0.5" value="2"></label>
               <label class="field">Bezpieczne Z <span>mm</span><input id="safeZ" type="number" min="0.001" max="1000000" step="0.5" value="5"></label>
+              <label class="field field-full">Ruch jałowy XY<select id="travelMode"><option value="rapid">G0 - szybki, prędkość ustawiana w Mach3</option><option value="controlled">G1 - posuw jałowy F (kontrolowany)</option></select></label>
+              <label class="field field-full" id="travelFeedWrap" hidden>Posuw jałowy XY F <span>mm/min</span><input id="travelFeed" type="number" min="0.001" max="1000000" step="10" value="600"></label>
+              <p class="hint field-full">Posuw roboczy F dotyczy wiercenia i helisy. G0 nie korzysta z posuwu F. Kontrolowany posuw G1 dotyczy tylko przejazdów XY na bezpiecznej wysokości Z; ruchy Z nadal używają G0. Cykl G81 nie umożliwia niezależnego F dla ruchów między otworami.</p>
               <label class="field field-full">Metoda generowania<select id="cycle"><option value="explicit">G0 / G1 · pełne cofnięcie po każdym otworze</option><option value="g81">G81 / G98 · standardowy cykl wiercenia</option><option value="helix">G3 · zagłębianie spiralne (interpolacja śrubowa)</option></select></label>
               <label class="field field-full">Średnica frezu / wiertła <span>mm</span><input id="toolDiameter" type="number" min="0.001" max="1000000" step="0.1" value="1"></label>
               <div id="helixOptions" class="field-full field-grid helix-settings" hidden>
@@ -97,7 +100,7 @@
           </section>
         </div>
       </div>
-      <footer><p><strong>Bezpieczeństwo:</strong> Program zakłada Z0 na powierzchni materiału, wybrany narożnik w G54 i dodatnie Z ponad materiałem. Zawsze wykonaj symulację oraz przejazd próbny nad materiałem. Sprawdź mocowanie, średnicę narzędzia, limity osi i sterowanie wrzecionem.</p><span>CMC POEM / OFFLINE GENERATOR / v1.4</span></footer>
+      <footer><p><strong>Bezpieczeństwo:</strong> Program zakłada Z0 na powierzchni materiału, wybrany narożnik w G54 i dodatnie Z ponad materiałem. Zawsze wykonaj symulację oraz przejazd próbny nad materiałem. Sprawdź mocowanie, średnicę narzędzia, limity osi i sterowanie wrzecionem.</p><span>CMC POEM / OFFLINE GENERATOR / v1.5</span></footer>
     </main>
   </div>
   <script type="module" src="./src/app.mjs"></script>

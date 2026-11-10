@@ -4,6 +4,8 @@ export const DEFAULTS = Object.freeze({
   pitchY: 3,
   depth: 0.8,
   feed: 80,
+  travelMode: 'rapid',
+  travelFeed: 600,
   retractZ: 2,
   safeZ: 5,
   orientation: 'horizontal',
@@ -23,6 +25,7 @@ const ORIENTATIONS = ['horizontal', 'vertical'];
 const ORDERS = ['rows', 'serpentine'];
 const CYCLES = ['explicit', 'g81', 'helix'];
 const SOURCE_MODES = ['binary', 'text'];
+const TRAVEL_MODES = ['rapid', 'controlled'];
 
 /** Read a grid of 0 and 1. Spaces and tabs can separate bits. Blank lines are ignored.
  * Short rows are padded with 0 on the right and reported as a warning.
@@ -112,6 +115,7 @@ export function buildPlan(source, settings = {}) {
     ['Punkt zerowy', o.origin, ORIGINS],
     ['Orientacja', o.orientation, ORIENTATIONS],
     ['Rodzaj wejścia', o.sourceMode, SOURCE_MODES],
+    ['Ruch jałowy XY', o.travelMode, TRAVEL_MODES],
     ['Kolejność', o.order, ORDERS],
     ['Tryb G-code', o.cycle, CYCLES],
   ]) if (!choices.includes(value)) throw new Error(`${label}: nieznana opcja.`);
@@ -119,7 +123,10 @@ export function buildPlan(source, settings = {}) {
   const pitchX = positiveNumber(o.pitchX, 'Odstęp X');
   const pitchY = positiveNumber(o.pitchY, 'Odstęp Y');
   const depth = positiveNumber(o.depth, 'Głębokość');
-  const feed = positiveNumber(o.feed, 'Posuw');
+  const feed = positiveNumber(o.feed, 'Posuw roboczy');
+  const travelFeed = o.travelMode === 'controlled' ? positiveNumber(o.travelFeed, 'Posuw jałowy XY') : null;
+  if (o.travelMode === 'controlled' && o.cycle === 'g81')
+    throw new Error('G81 wymusza szybkie przejazdy między nawiertami. Wybierz G0 lub tryb G0/G1 dla kontrolowanego posuwu jałowego.');
   const retractZ = positiveNumber(o.retractZ, 'Poziom R');
   const safeZ = positiveNumber(o.safeZ, 'Bezpieczne Z');
   if (safeZ < retractZ) throw new Error('Bezpieczne Z musi być większe lub równe poziomowi R.');
@@ -142,11 +149,13 @@ export function buildPlan(source, settings = {}) {
   if (o.spindle && !Number.isInteger(rpm)) throw new Error('Obroty wrzeciona muszą być liczbą całkowitą.');
 
   const parsed = parsePattern(source);
-  // Manually entered matrices retain legacy behaviour: vertical rotates 90° CW.
-  // UTF-8 text is already formatted as byte rows. Vertical MUST preserve
-  // these rows; horizontal turns the byte sequence across the machine's X axis.
-  const rotate = o.sourceMode === 'text' ? o.orientation === 'horizontal' : o.orientation === 'vertical';
-  const matrix = orientedMatrix(parsed.matrix, rotate ? 'vertical' : 'horizontal');
+  // Both layouts advance through successive source rows ALONG Y.
+  // Horizontal: bits are left-to-right in each row. Vertical: bits inside each
+  // byte (or a single manually entered row) go top-to-bottom in a strip;
+  // consecutive input rows still follow one another along Y.
+  const matrix = o.orientation === 'horizontal'
+    ? orientedMatrix(parsed.matrix, 'horizontal')
+    : verticalStripMatrix(parsed.matrix, o.sourceMode);
   const rows = matrix.length;
   const cols = matrix[0].length;
   const width = (cols - 1) * pitchX;
@@ -168,7 +177,7 @@ export function buildPlan(source, settings = {}) {
   }
   if (!holes.length) throw new Error('We wzorze nie ma ani jednej jedynki (nawiertu).');
   return {
-    ...o, pitchX, pitchY, depth, feed, retractZ, safeZ, rpm, toolDiameter, holeDiameter, helixStep,
+    ...o, pitchX, pitchY, depth, feed, travelFeed, retractZ, safeZ, rpm, toolDiameter, holeDiameter, helixStep,
     matrix, rows, cols, holes, width, height,
     ones: holes.length, zeros: rows * cols - holes.length,
     warnings: parsed.warnings,
@@ -190,6 +199,8 @@ export function generateGcode(plan) {
     `(SIZE BETWEEN EXTREME CENTERS X${fmt(p.width)} Y${fmt(p.height)} MM)`,
     `(ORIGIN ${p.origin.toUpperCase()} - ORIENTATION ${p.orientation.toUpperCase()})`,
     `(PATTERN SOURCE ${p.sourceMode === 'text' ? 'UTF8-BYTE-ROWS' : 'BINARY-MATRIX'})`,
+    `(WORK FEED F${fmt(p.feed)} MM/MIN)`,
+    p.travelMode === 'controlled' ? `(IDLE XY G1 F${fmt(p.travelFeed)} MM/MIN - Z RAPID G0)` : '(IDLE XY G0 - SPEED SET BY MACH3 MACHINE CONFIG)',
     ...(p.stage ? [
       `(STAGE ${p.stage.number}/${p.stage.total} - GRID COL ${p.stage.colStart + 1}-${p.stage.colEnd} ROW ${p.stage.rowStart + 1}-${p.stage.rowEnd})`,
       `(ORIGINAL PATTERN OFFSET OF STAGE G54 X${fmt(p.stage.offsetX)} Y${fmt(p.stage.offsetY)} MM)`,
@@ -207,6 +218,10 @@ export function generateGcode(plan) {
   if (p.spindle) output.push(`S${p.rpm} M3`);
   else output.push('(SPINDLE CONTROL OFF - START SPINDLE MANUALLY IF REQUIRED)');
 
+  const travelXY = (x,y) => p.travelMode === 'controlled'
+    ? `G1 X${fmt(x)} Y${fmt(y)} F${fmt(p.travelFeed)}`
+    : `G0 X${fmt(x)} Y${fmt(y)}`;
+
   if (p.cycle === 'helix') {
     const radius = (p.holeDiameter - p.toolDiameter) / 2;
     const loops = Math.ceil(p.depth / p.helixStep);
@@ -218,7 +233,7 @@ export function generateGcode(plan) {
       const xRight = hole.x + radius;
       const xLeft = hole.x - radius;
       output.push(`(HELIX AT X${fmt(hole.x)} Y${fmt(hole.y)})`,
-        `G0 X${fmt(xRight)} Y${fmt(hole.y)}`,
+        travelXY(xRight, hole.y),
         `G0 Z${fmt(p.retractZ)}`,
         `G1 Z0.000 F${fmt(p.feed)}`);
       for (let i = 1; i <= loops; i++) {
@@ -241,7 +256,7 @@ export function generateGcode(plan) {
   } else {
     for (const hole of p.holes) {
       output.push(
-        `G0 X${fmt(hole.x)} Y${fmt(hole.y)}`,
+        travelXY(hole.x, hole.y),
         `G0 Z${fmt(p.retractZ)}`,
         `G1 Z-${fmt(p.depth)} F${fmt(p.feed)}`,
         `G0 Z${fmt(p.safeZ)}`,
@@ -253,12 +268,28 @@ export function generateGcode(plan) {
   return output.join('\n');
 }
 
-/** Map a clicked preview cell back into the original, unrotated text grid. */
+/** Reshape each original row into a vertical strip of parallel 8-bit columns.
+ * If a manual binary row is not byte-aligned, treat that entire row as one
+ * vertical column instead. All successive input rows are stacked down Y.
+ */
+function verticalGroupSize(cols, sourceMode) {
+  return sourceMode === 'text' || cols % 8 === 0 ? 8 : cols;
+}
+export function verticalStripMatrix(matrix, sourceMode = 'binary') {
+  const group = verticalGroupSize(matrix[0].length, sourceMode);
+  const columns = Math.ceil(matrix[0].length / group);
+  return Array.from({length: matrix.length * group}, (_, r) =>
+    Array.from({length: columns}, (_, c) =>
+      matrix[Math.floor(r / group)][c * group + (r % group)] ?? 0));
+}
+
+/** Map a clicked preview cell back to the source bit in either Y-growing layout. */
 export function toggleCell(source, orientation, displayRow, displayCol, sourceMode = 'binary') {
   const original = parsePattern(source);
-  const rotate = sourceMode === 'text' ? orientation === 'horizontal' : orientation === 'vertical';
-  const r = rotate ? original.rows - 1 - displayCol : displayRow;
-  const c = rotate ? displayRow : displayCol;
+  if (!ORIENTATIONS.includes(orientation)) throw new Error('Nieznana orientacja siatki.');
+  const group = verticalGroupSize(original.cols, sourceMode);
+  const r = orientation === 'vertical' ? Math.floor(displayRow / group) : displayRow;
+  const c = orientation === 'vertical' ? displayCol * group + (displayRow % group) : displayCol;
   if (r < 0 || r >= original.rows || c < 0 || c >= original.cols) throw new Error('Pole jest poza siatką.');
   original.matrix[r][c] = original.matrix[r][c] ? 0 : 1;
   return original.matrix.map(row => row.join('')).join('\n');
@@ -280,10 +311,10 @@ export function buildStages(plan, options = {}) {
   const capacity = (area, pitch, count) => enabled
     ? Math.max(1, Math.min(count, Math.floor((area - featureDiameter + 1e-8) / pitch) + 1))
     : count;
-  const columnsPerStage = capacity(areaX, plan.pitchX, plan.cols);
+  const areaColumnsPerStage = capacity(areaX, plan.pitchX, plan.cols);
   const areaRowsPerStage = capacity(areaY, plan.pitchY, plan.rows);
-  // Optional explicit split frequency counts rows of the *oriented* (displayed) grid.
-  // An empty value retains automatic size-based splitting. Area remains a hard limit.
+  // All stages follow Y; the work width X must fit the complete strip.
+  // N is the maximum number of visible output rows per stage in both layouts.
   let lineLimit = null;
   if (enabled && options.linesPerStage !== undefined && options.linesPerStage !== null && String(options.linesPerStage).trim() !== '') {
     const count = Number(options.linesPerStage);
@@ -291,16 +322,23 @@ export function buildStages(plan, options = {}) {
       throw new Error('Podział co N linii: podaj liczbę całkowitą od 1 do 250.');
     lineLimit = count;
   }
+  if (enabled && areaColumnsPerStage < plan.cols)
+    throw new Error('Wzór jest za szeroki dla limitu X. Zmniejsz bajty na wiersz, rozstaw X lub średnicę narzędzia. Podział etapów jest możliwy tylko wzdłuż Y.');
+  const columnsPerStage = plan.cols;
   const rowsPerStage = lineLimit === null ? areaRowsPerStage : Math.min(areaRowsPerStage, lineLimit);
+  const lineAxis = 'Y';
+  const actualLinesPerStage = rowsPerStage;
   const countX = Math.ceil(plan.cols / columnsPerStage);
   const countY = Math.ceil(plan.rows / rowsPerStage);
   const total = countX * countY;
-  if (total > 500) throw new Error('Podział daje ponad 500 etapów. Zwiększ maksymalny obszar roboczy.');
+  if (total > 500) throw new Error('Podział daje ponad 500 etapów. Zwiększ maksymalny obszar Y albo liczbę wierszy na etap.');
   const stages = [];
-  for (let yIndex = 0; yIndex < countY; yIndex++) {
+  const positions = [];
+  for (let y = 0; y < countY; y++) positions.push([0,y]);
+  for (const [xIndex, yIndex] of positions) {
     const rowStart = yIndex * rowsPerStage;
     const rowEnd = Math.min(plan.rows, rowStart + rowsPerStage);
-    for (let xIndex = 0; xIndex < countX; xIndex++) {
+    {
       const colStart = xIndex * columnsPerStage;
       const colEnd = Math.min(plan.cols, colStart + columnsPerStage);
       const rows = rowEnd - rowStart;
@@ -333,5 +371,5 @@ export function buildStages(plan, options = {}) {
     }
   }
   if (stages.reduce((n,s)=>n+s.ones,0) !== plan.ones) throw new Error('Błąd podziału: utrata nawiertów.');
-  return {stages, columnsPerStage, rowsPerStage, areaRowsPerStage, lineLimit, countX, countY, total, areaX, areaY, featureDiameter};
+  return {stages, columnsPerStage, rowsPerStage, areaColumnsPerStage, areaRowsPerStage, lineLimit, lineAxis, actualLinesPerStage, countX, countY, total, areaX, areaY, featureDiameter};
 }

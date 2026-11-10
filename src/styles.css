@@ -33,4 +33,4 @@ textarea,input,select{border:1px solid #384448;background:#0c1214;color:#edf3f0;
 .download-all{margin-top:12px;background:#1d3030;color:#c9eee2;border-color:#3a695b;width:100%;font-size:13px}
 .download-all:hover:not(:disabled){filter:brightness(1.15)}
 @media(max-width:650px){.stage-settings,.helix-settings{padding:12px}.stage-settings .field-grid{grid-template-columns:1fr}}
-#stageDimensions[hidden]{display:none!important}
+#stageDimensions[hidden],#travelFeedWrap[hidden]{display:none!important}

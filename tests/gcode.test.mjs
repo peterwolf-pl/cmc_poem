@@ -9,14 +9,14 @@ test('parse binary lines and pad short rows with zero', () => {
   assert.equal(p.warnings.length, 1);
 });
 test('rejects invalid characters', () => assert.throws(() => parsePattern('101\n10A'), /Wiersz 2/));
-test('horizontal and vertical dimensions and rotation', () => {
+test('horizontal and vertical bits layouts both advance along Y', () => {
   const h = buildPlan('100\n011', settings);
   assert.equal(h.cols, 3);assert.equal(h.rows, 2);
   assert.equal(h.width, 10);assert.equal(h.height, 10);
   const v = buildPlan('100\n011', {...settings, orientation:'vertical'});
-  assert.deepEqual(v.matrix, [[0,1],[1,0],[1,0]]);
-  assert.equal(v.cols, 2);assert.equal(v.rows, 3);
-  assert.equal(v.width, 5);assert.equal(v.height, 20);
+  assert.deepEqual(v.matrix, [[1],[0],[0],[0],[1],[1]]);
+  assert.equal(v.cols, 1);assert.equal(v.rows, 6);
+  assert.equal(v.width, 0);assert.equal(v.height, 50);
 });
 test('origin transform across all corners', () => {
   const matrix = '10\n01';
@@ -64,8 +64,9 @@ test('numeric constraints and no holes rejected', () => {
   assert.throws(() => buildPlan('1', {...settings, pitchX:-3}), /Odstęp X/);
   assert.throws(() => buildPlan('1', {...settings, feed:'garbage'}), /Posuw/);
 });
-test('clicking rotated preview maps back to original', () => {
-  assert.equal(toggleCell('10\n00', 'vertical', 0, 1), '00\n00');
+test('clicking preview maps back to original bit in both orientations', () => {
+  assert.equal(toggleCell('10\n00', 'vertical', 0, 0), '00\n00');
+  assert.equal(toggleCell('10\n00', 'vertical', 3, 0), '10\n01');
   assert.equal(toggleCell('10\n00', 'horizontal', 1, 1), '10\n01');
 });
 test('single cell yields zero span, nonzero tool travel', () => {
@@ -88,33 +89,34 @@ test('text converter rejects invalid width and blank text', () => {
 });
 
 
-test('UTF-8 one byte per row in vertical layout grows down Y, not across X', () => {
+test('vertical UTF-8 stores each 8-bit byte along Y and subsequent bytes below', () => {
   const source = textToBinary('ABCD', 1);
   assert.equal(source, '01000001\n01000010\n01000011\n01000100');
   const vertical = buildPlan(source, {...settings, sourceMode: 'text', orientation: 'vertical', pitchX: 3, pitchY: 5});
-  assert.equal(vertical.cols, 8);
-  assert.equal(vertical.rows, 4);
-  assert.equal(vertical.width, 21);
-  assert.equal(vertical.height, 15);
-  assert.equal(vertical.matrix[0].join(''), '01000001');
-  assert.equal(vertical.matrix[3].join(''), '01000100');
-  const stageData = buildStages(vertical, { enabled: true, maxAreaX: 50, maxAreaY: 12, linesPerStage: 2, drillDiameter: 1 });
-  assert.equal(stageData.total, 2);
-  assert.deepEqual(stageData.stages.map(s => [s.cols, s.rows]), [[8, 2], [8, 2]]);
+  assert.equal(vertical.cols, 1);
+  assert.equal(vertical.rows, 32);
+  assert.equal(vertical.width, 0);
+  assert.equal(vertical.height, 155);
+  assert.equal(vertical.matrix.slice(0,8).map(row => row[0]).join(''), '01000001');
+  assert.equal(vertical.matrix.slice(24,32).map(row => row[0]).join(''), '01000100');
+  const stageData = buildStages(vertical, { enabled: true, maxAreaX: 50, maxAreaY: 40, linesPerStage: 8, drillDiameter: 1 });
+  assert.equal(stageData.total, 4);
+  assert.deepEqual(stageData.stages.map(s => [s.cols, s.rows]), [[1, 8], [1, 8], [1, 8], [1, 8]]);
   const stitched = new Set(stageData.stages.flatMap(s => s.holes.map(h => `${h.x + s.stage.offsetX},${h.y + s.stage.offsetY}`)));
   assert.deepEqual(stitched, new Set(vertical.holes.map(h => `${h.x},${h.y}`)));
   for (const stage of stageData.stages) assert.match(generateGcode(stage), /\(PATTERN SOURCE UTF8-BYTE-ROWS\)/);
 });
 
-test('UTF-8 horizontal makes bytes advance across X while manual matrices remain backward compatible', () => {
+test('horizontal UTF-8 keeps bytes in rows while vertical makes a column', () => {
   const source = textToBinary('ABCD',1);
   const h = buildPlan(source, {...settings, sourceMode:'text', orientation:'horizontal'});
-  assert.equal(h.cols,4);
-  assert.equal(h.rows,8);
-  assert.equal(h.matrix[0].join(''), '0000');
+  assert.equal(h.cols,8);
+  assert.equal(h.rows,4);
+  assert.equal(h.matrix[0].join(''), '01000001');
   const vBinary = buildPlan(source, {...settings, sourceMode:'binary', orientation:'vertical'});
-  assert.deepEqual(vBinary.matrix,h.matrix);
-  assert.equal(toggleCell(source,'vertical',0,1,'text'), '00000001\n01000010\n01000011\n01000100');
-  assert.equal(toggleCell(source,'horizontal',1,0,'text'), '01000001\n01000010\n01000011\n00000100');
+  assert.equal(vBinary.cols,1);
+  assert.equal(vBinary.rows,32);
+  assert.equal(toggleCell(source,'vertical',0,0,'text'), '11000001\n01000010\n01000011\n01000100');
+  assert.equal(toggleCell(source,'horizontal',1,0,'text'), '01000001\n11000010\n01000011\n01000100');
   assert.throws(()=>buildPlan('1',{...settings,sourceMode:'strange'}),/Rodzaj wejścia/);
 });
